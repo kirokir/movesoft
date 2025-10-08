@@ -224,7 +224,8 @@
         .status-active { background: #43e97b; }
         .status-recording { background: #f5576c; }
         .status-idle { background: #999; }
-        
+        .status-validating { background: #ffc107; }
+
         .discrepancy-item {
             padding: 10px;
             margin: 5px 0;
@@ -264,10 +265,16 @@
             background: white;
             border-radius: 20px;
             padding: 30px;
-            max-width: 600px;
+            max-width: 800px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
+        }
+
+        .chart-container {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
         }
         
         .progress-bar {
@@ -322,8 +329,8 @@
                     <option value="general">General Movement</option>
                     <option value="sit_to_stand">Sit to Stand</option>
                     <option value="gait">Gait Analysis</option>
-                    <option value="shoulder_rom">Shoulder ROM</option>
-                    <option value="knee_flexion">Knee Flexion</option>
+                    <option value="shoulder_rom">Shoulder ROM (Abduction)</option>
+                    <option value="knee_flexion">Knee Flexion (Squat)</option>
                     <option value="balance">Balance Test</option>
                     <option value="supine">Supine (Bed)</option>
                     <option value="prone">Prone Position</option>
@@ -361,29 +368,10 @@
             <div class="metrics-panel">
                 <h3 style="margin-bottom: 15px; color: #667eea;">Live Metrics</h3>
                 <div id="metricsContainer">
-                    <div class="metric-item">
-                        <div class="metric-label">Neck Angle</div>
-                        <div class="metric-value">--<span class="metric-unit">°</span></div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Shoulder Flexion</div>
-                        <div class="metric-value">--<span class="metric-unit">°</span></div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Elbow Angle</div>
-                        <div class="metric-value">--<span class="metric-unit">°</span></div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Hip Flexion</div>
-                        <div class="metric-value">--<span class="metric-unit">°</span></div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Knee Angle</div>
-                        <div class="metric-value">--<span class="metric-unit">°</span></div>
-                    </div>
-                    <div class="metric-label" style="margin-top: 20px;">Movement Quality</div>
-                    <div id="discrepancyContainer"></div>
+                    <!-- Metrics will be dynamically populated here -->
                 </div>
+                <div class="metric-label" style="margin-top: 20px;">Movement Quality</div>
+                <div id="discrepancyContainer"></div>
             </div>
         </div>
         
@@ -391,6 +379,12 @@
             <div class="modal-content">
                 <h2>Session Report</h2>
                 <div id="reportContent"></div>
+                <div class="chart-container">
+                    <canvas id="timeSeriesChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="symmetryChart"></canvas>
+                </div>
                 <div class="control-row" style="margin-top: 20px;">
                     <button onclick="exportReport('pdf')" class="btn btn-primary">Download PDF</button>
                     <button onclick="exportReport('json')" class="btn btn-info">Export JSON</button>
@@ -404,43 +398,31 @@
     <script>
         // Core System Configuration
         const CONFIG = {
-            fps: 60,
+            fps: 30, // Reduced for more stable performance with heavier model
             smoothingWindow: 5,
-            confidenceThreshold: 0.5,
+            confidenceThreshold: 0.6, // Increased for higher quality detection
+            minKeypointsForValidPose: 12,
             jointMap: {
-                C1: 'nose',
-                C2: 'leftEye',
-                C3: 'rightEye',
-                C4: 'leftEar',
-                C5: 'rightEar',
-                C6: 'leftShoulder',
-                C7: 'rightShoulder',
-                C8: 'leftElbow',
-                C9: 'rightElbow',
-                C10: 'leftWrist',
-                C11: 'rightWrist',
-                C12: 'leftHip',
-                C13: 'rightHip',
-                C14: 'leftKnee',
-                C15: 'rightKnee',
-                C16: 'leftAnkle',
-                C17: 'rightAnkle'
+                C1: 'nose', C2: 'left_eye', C3: 'right_eye', C4: 'left_ear', C5: 'right_ear',
+                C6: 'left_shoulder', C7: 'right_shoulder', C8: 'left_elbow', C9: 'right_elbow',
+                C10: 'left_wrist', C11: 'right_wrist', C12: 'left_hip', C13: 'right_hip',
+                C14: 'left_knee', C15: 'right_knee', C16: 'left_ankle', C17: 'right_ankle'
             },
             normatives: {
-                sit_to_stand: {
-                    hipFlexion: { min: 90, max: 120, optimal: 105 },
-                    kneeFlexion: { min: 90, max: 110, optimal: 100 },
-                    duration: { min: 1.5, max: 3.5, optimal: 2.5 }
-                },
+                // Expanded normative data
                 shoulder_rom: {
-                    flexion: { min: 150, max: 180, optimal: 170 },
                     abduction: { min: 150, max: 180, optimal: 170 },
-                    rotation: { min: 70, max: 90, optimal: 80 }
+                    torsoLeanMax: 15, // Max allowable torso lean in degrees
+                    symmetryDiffMax: 15 // Max allowable difference between L/R ROM
                 },
-                gait: {
-                    strideLength: { min: 1.2, max: 1.6, optimal: 1.4 },
-                    cadence: { min: 100, max: 130, optimal: 115 },
-                    stepSymmetry: { min: 0.9, max: 1.1, optimal: 1.0 }
+                knee_flexion: {
+                    flexion: { min: 90, max: 120, optimal: 110 },
+                    hipFlexion: { min: 80, max: 110, optimal: 100 },
+                    kneeValgusMax: 10, // Max inward knee movement angle
+                    symmetryDiffMax: 10
+                },
+                balance: {
+                    swayAreaMax: 2500 // Max postural sway area (pixels squared)
                 }
             }
         };
@@ -448,789 +430,369 @@
         // Global State
         let detector = null;
         let isRecording = false;
-        let frameData = [];
-        let sessionData = {
-            id: null,
-            task: null,
-            orientation: null,
-            startTime: null,
-            endTime: null,
-            frames: [],
-            metrics: [],
-            discrepancies: []
-        };
+        let isCalibrating = false;
+        let isPositionValid = false;
         let animationId = null;
-        let calibrationData = null;
+        let calibrationData = { pose: null, ratios: null };
         let frameCount = 0;
         let lastFrameTime = Date.now();
         let fps = 0;
+        let lastPose = null;
+        let previousMetrics = {};
+        window.myTimeSeriesChart = null;
+        window.mySymmetryChart = null;
 
-        // Joint and Bone Processing
+        // --- Class Definitions ---
         class JointProcessor {
-            constructor() {
-                this.history = {};
-                this.smoothingBuffer = {};
-            }
+            constructor() { this.smoothingBuffer = {}; }
 
             processKeypoints(keypoints) {
                 const joints = {};
-                const bones = {};
-                const timestamp = new Date().toISOString();
-
-                // Map keypoints to coded joints
-                keypoints.forEach((kp, i) => {
-                    const jointCode = Object.keys(CONFIG.jointMap).find(
-                        key => CONFIG.jointMap[key] === kp.name
-                    );
-                    if (jointCode) {
-                        joints[jointCode] = {
-                            x: kp.x,
-                            y: kp.y,
-                            z: kp.score > CONFIG.confidenceThreshold ? (kp.z || 0) : 0,
-                            confidence: kp.score
-                        };
+                keypoints.forEach(kp => {
+                    const jointCode = Object.keys(CONFIG.jointMap).find(key => CONFIG.jointMap[key] === kp.name);
+                    if (jointCode && kp.score > CONFIG.confidenceThreshold) {
+                        joints[jointCode] = { x: kp.x, y: kp.y, z: kp.z || 0, confidence: kp.score };
                     }
                 });
-
-                // Calculate bones (connections between joints)
-                this.calculateBones(joints, bones);
-
-                return { joints, bones, timestamp };
-            }
-
-            calculateBones(joints, bones) {
-                const connections = [
-                    ['C1', 'C2'], ['C1', 'C3'], // Face
-                    ['C6', 'C7'], // Shoulders
-                    ['C6', 'C8'], ['C7', 'C9'], // Upper arms
-                    ['C8', 'C10'], ['C9', 'C11'], // Forearms
-                    ['C6', 'C12'], ['C7', 'C13'], // Torso
-                    ['C12', 'C13'], // Pelvis
-                    ['C12', 'C14'], ['C13', 'C15'], // Thighs
-                    ['C14', 'C16'], ['C15', 'C17'] // Shins
-                ];
-
-                connections.forEach((conn, i) => {
-                    const [j1, j2] = conn;
-                    if (joints[j1] && joints[j2]) {
-                        const dx = joints[j2].x - joints[j1].x;
-                        const dy = joints[j2].y - joints[j1].y;
-                        const dz = joints[j2].z - joints[j1].z;
-                        const length = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                        
-                        bones[`B${i+1}`] = {
-                            start: j1,
-                            end: j2,
-                            vector: [dx, dy, dz],
-                            length: length
-                        };
-                    }
-                });
+                return this.smoothJoints(joints);
             }
 
             smoothJoints(joints) {
+                // EMA smoothing
+                const alpha = 0.4;
                 Object.keys(joints).forEach(code => {
-                    if (!this.smoothingBuffer[code]) {
-                        this.smoothingBuffer[code] = [];
-                    }
-                    
-                    this.smoothingBuffer[code].push(joints[code]);
-                    if (this.smoothingBuffer[code].length > CONFIG.smoothingWindow) {
-                        this.smoothingBuffer[code].shift();
-                    }
-                    
-                    // Apply exponential moving average
-                    if (this.smoothingBuffer[code].length > 1) {
-                        const alpha = 0.3;
-                        const prev = this.smoothingBuffer[code][this.smoothingBuffer[code].length - 2];
-                        joints[code].x = alpha * joints[code].x + (1 - alpha) * prev.x;
-                        joints[code].y = alpha * joints[code].y + (1 - alpha) * prev.y;
-                        joints[code].z = alpha * joints[code].z + (1 - alpha) * prev.z;
-                    }
+                    if (!this.smoothingBuffer[code]) { this.smoothingBuffer[code] = joints[code]; }
+                    this.smoothingBuffer[code].x = alpha * joints[code].x + (1 - alpha) * this.smoothingBuffer[code].x;
+                    this.smoothingBuffer[code].y = alpha * joints[code].y + (1 - alpha) * this.smoothingBuffer[code].y;
+                    this.smoothingBuffer[code].z = alpha * joints[code].z + (1 - alpha) * this.smoothingBuffer[code].z;
+                    joints[code] = this.smoothingBuffer[code];
                 });
-                
                 return joints;
             }
         }
 
-        // Metrics Calculator
         class MetricsCalculator {
+            constructor() { this.romTracking = {}; }
+
             calculateAngle(p1, p2, p3) {
-                const v1 = {
-                    x: p1.x - p2.x,
-                    y: p1.y - p2.y,
-                    z: p1.z - p2.z
-                };
-                const v2 = {
-                    x: p3.x - p2.x,
-                    y: p3.y - p2.y,
-                    z: p3.z - p2.z
-                };
-                
-                const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-                const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
-                const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
-                
+                if (!p1 || !p2 || !p3) return null;
+                const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
+                const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+                const dot = v1.x * v2.x + v1.y * v2.y;
+                const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+                const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
                 if (mag1 === 0 || mag2 === 0) return 0;
-                
                 const cosAngle = dot / (mag1 * mag2);
                 return Math.acos(Math.max(-1, Math.min(1, cosAngle))) * 180 / Math.PI;
             }
 
             calculateVelocity(current, previous, deltaTime) {
-                if (!previous || !deltaTime) return 0;
-                
+                if (!previous || !current || !deltaTime) return 0;
                 const dx = current.x - previous.x;
                 const dy = current.y - previous.y;
-                const dz = current.z - previous.z;
-                
-                return Math.sqrt(dx*dx + dy*dy + dz*dz) / deltaTime;
+                return Math.sqrt(dx*dx + dy*dy) / deltaTime;
+            }
+            
+            calculateAcceleration(currentVel, previousVel, deltaTime) {
+                if (previousVel === undefined || !deltaTime) return 0;
+                return (currentVel - previousVel) / deltaTime;
             }
 
             calculateMetrics(joints, previousJoints, deltaTime) {
                 const metrics = {};
                 
-                // Neck angle
-                if (joints.C1 && joints.C6 && joints.C7) {
-                    const midShoulder = {
-                        x: (joints.C6.x + joints.C7.x) / 2,
-                        y: (joints.C6.y + joints.C7.y) / 2,
-                        z: (joints.C6.z + joints.C7.z) / 2
-                    };
-                    metrics.neckAngle = this.calculateAngle(
-                        joints.C1,
-                        midShoulder,
-                        { x: midShoulder.x, y: midShoulder.y + 100, z: midShoulder.z }
-                    );
+                // --- Angles ---
+                metrics.leftShoulderAngle = this.calculateAngle(joints.C8, joints.C6, joints.C12);
+                metrics.rightShoulderAngle = this.calculateAngle(joints.C9, joints.C7, joints.C13);
+                metrics.leftElbowAngle = this.calculateAngle(joints.C6, joints.C8, joints.C10);
+                metrics.rightElbowAngle = this.calculateAngle(joints.C7, joints.C9, joints.C11);
+                metrics.leftHipAngle = this.calculateAngle(joints.C6, joints.C12, joints.C14);
+                metrics.rightHipAngle = this.calculateAngle(joints.C7, joints.C13, joints.C15);
+                metrics.leftKneeAngle = this.calculateAngle(joints.C12, joints.C14, joints.C16);
+                metrics.rightKneeAngle = this.calculateAngle(joints.C13, joints.C15, joints.C17);
+
+                // Torso Lean
+                if (joints.C6 && joints.C7 && joints.C12 && joints.C13) {
+                    const shoulderMid = { x: (joints.C6.x + joints.C7.x) / 2, y: (joints.C6.y + joints.C7.y) / 2 };
+                    const hipMid = { x: (joints.C12.x + joints.C13.x) / 2, y: (joints.C12.y + joints.C13.y) / 2 };
+                    metrics.torsoAngle = 90 - (Math.atan2(shoulderMid.y - hipMid.y, shoulderMid.x - hipMid.x) * 180 / Math.PI);
                 }
-                
-                // Shoulder angles
-                if (joints.C6 && joints.C8 && joints.C10) {
-                    metrics.leftShoulderAngle = this.calculateAngle(joints.C6, joints.C8, joints.C10);
-                }
-                if (joints.C7 && joints.C9 && joints.C11) {
-                    metrics.rightShoulderAngle = this.calculateAngle(joints.C7, joints.C9, joints.C11);
-                }
-                
-                // Elbow angles
-                if (joints.C6 && joints.C8 && joints.C10) {
-                    metrics.leftElbowAngle = this.calculateAngle(joints.C6, joints.C8, joints.C10);
-                }
-                if (joints.C7 && joints.C9 && joints.C11) {
-                    metrics.rightElbowAngle = this.calculateAngle(joints.C7, joints.C9, joints.C11);
-                }
-                
-                // Hip angles
-                if (joints.C6 && joints.C12 && joints.C14) {
-                    metrics.leftHipAngle = this.calculateAngle(joints.C6, joints.C12, joints.C14);
-                }
-                if (joints.C7 && joints.C13 && joints.C15) {
-                    metrics.rightHipAngle = this.calculateAngle(joints.C7, joints.C13, joints.C15);
-                }
-                
-                // Knee angles
-                if (joints.C12 && joints.C14 && joints.C16) {
-                    metrics.leftKneeAngle = this.calculateAngle(joints.C12, joints.C14, joints.C16);
-                }
-                if (joints.C13 && joints.C15 && joints.C17) {
-                    metrics.rightKneeAngle = this.calculateAngle(joints.C13, joints.C15, joints.C17);
-                }
-                
-                // Calculate velocities if we have previous frame
+
+                // --- Dynamic Metrics ---
                 if (previousJoints && deltaTime > 0) {
                     Object.keys(joints).forEach(jointCode => {
-                        if (previousJoints[jointCode]) {
-                            metrics[`vel_${jointCode}`] = this.calculateVelocity(
-                                joints[jointCode],
-                                previousJoints[jointCode],
-                                deltaTime
-                            );
-                        }
+                        const vel = this.calculateVelocity(joints[jointCode], previousJoints[jointCode], deltaTime);
+                        metrics[`vel_${jointCode}`] = vel;
+                        metrics[`accel_${jointCode}`] = this.calculateAcceleration(vel, previousMetrics[`vel_${jointCode}`], deltaTime);
                     });
                 }
                 
-                // Range of Motion tracking
-                this.updateROM(joints, metrics);
-                
-                // Symmetry index
-                if (metrics.leftShoulderAngle && metrics.rightShoulderAngle) {
-                    metrics.shoulderSymmetry = Math.min(
-                        metrics.leftShoulderAngle / metrics.rightShoulderAngle,
-                        metrics.rightShoulderAngle / metrics.leftShoulderAngle
-                    );
+                // Postural Sway (area of hip movement)
+                if (isRecording) {
+                    const hipMid = joints.C12 && joints.C13 ? { x: (joints.C12.x + joints.C13.x) / 2, y: (joints.C12.y + joints.C13.y) / 2 } : null;
+                    if (hipMid) {
+                        if (!this.swayPoints) this.swayPoints = [];
+                        this.swayPoints.push(hipMid);
+                        // Simplified sway calculation - range of movement
+                        const xSway = Math.max(...this.swayPoints.map(p => p.x)) - Math.min(...this.swayPoints.map(p => p.x));
+                        const ySway = Math.max(...this.swayPoints.map(p => p.y)) - Math.min(...this.swayPoints.map(p => p.y));
+                        metrics.posturalSway = xSway * ySway;
+                    }
                 }
-                if (metrics.leftKneeAngle && metrics.rightKneeAngle) {
-                    metrics.kneeSymmetry = Math.min(
-                        metrics.leftKneeAngle / metrics.rightKneeAngle,
-                        metrics.rightKneeAngle / metrics.leftKneeAngle
-                    );
+
+                this.updateROM(metrics);
+
+                // --- Symmetry ---
+                if (metrics.leftKneeAngle_ROM !== undefined && metrics.rightKneeAngle_ROM !== undefined) {
+                    metrics.kneeSymmetryDifference = Math.abs(metrics.leftKneeAngle_ROM - metrics.rightKneeAngle_ROM);
+                }
+                if (metrics.leftShoulderAngle_ROM !== undefined && metrics.rightShoulderAngle_ROM !== undefined) {
+                    metrics.shoulderSymmetryDifference = Math.abs(metrics.leftShoulderAngle_ROM - metrics.rightShoulderAngle_ROM);
                 }
                 
+                previousMetrics = metrics;
                 return metrics;
             }
             
-            updateROM(joints, metrics) {
-                if (!this.romTracking) {
-                    this.romTracking = {};
-                }
-                
-                // Track min/max for each angle
+            updateROM(metrics) {
+                if (!isRecording) return;
                 Object.keys(metrics).forEach(key => {
-                    if (key.includes('Angle')) {
-                        if (!this.romTracking[key]) {
-                            this.romTracking[key] = { min: metrics[key], max: metrics[key] };
-                        }
+                    if (key.includes('Angle') && metrics[key] !== null) {
+                        if (!this.romTracking[key]) { this.romTracking[key] = { min: metrics[key], max: metrics[key] }; }
                         this.romTracking[key].min = Math.min(this.romTracking[key].min, metrics[key]);
                         this.romTracking[key].max = Math.max(this.romTracking[key].max, metrics[key]);
                         metrics[`${key}_ROM`] = this.romTracking[key].max - this.romTracking[key].min;
                     }
                 });
             }
+            
+            reset() { this.romTracking = {}; this.swayPoints = []; }
         }
 
-        // Discrepancy Analyzer
         class DiscrepancyAnalyzer {
-            analyze(metrics, task, orientation) {
+            analyze(metrics, task) {
                 const discrepancies = [];
-                const normative = CONFIG.normatives[task];
-                
-                if (!normative) return discrepancies;
-                
-                // Check hip flexion for sit-to-stand
-                if (task === 'sit_to_stand') {
-                    if (metrics.leftHipAngle) {
-                        const deviation = this.calculateDeviation(
-                            metrics.leftHipAngle,
-                            normative.hipFlexion
-                        );
-                        if (deviation.percentage > 10) {
-                            discrepancies.push({
-                                joint: 'C12',
-                                metric: 'Hip Flexion',
-                                value: metrics.leftHipAngle,
-                                expected: normative.hipFlexion.optimal,
-                                deviation: deviation.percentage,
-                                severity: this.getSeverity(deviation.percentage),
-                                recommendation: this.getRecommendation('hip_flexion', deviation)
-                            });
+                const norm = CONFIG.normatives[task];
+                if (!norm) return discrepancies;
+
+                switch (task) {
+                    case 'shoulder_rom':
+                        const rom = metrics.rightShoulderAngle_ROM || metrics.leftShoulderAngle_ROM || 0;
+                        if (rom < norm.abduction.min) {
+                            discrepancies.push(this.createDiscrepancy('Shoulder ROM', 'low', `Range of motion (${rom.toFixed(0)}°) is below the expected minimum of ${norm.abduction.min}°.`, 'Focus on pendular exercises and wall slides to improve mobility.'));
                         }
-                    }
-                }
-                
-                // Check shoulder ROM
-                if (task === 'shoulder_rom') {
-                    if (metrics.leftShoulderAngle_ROM) {
-                        const deviation = this.calculateDeviation(
-                            metrics.leftShoulderAngle_ROM,
-                            normative.flexion
-                        );
-                        if (deviation.percentage > 10) {
-                            discrepancies.push({
-                                joint: 'C6-C8',
-                                metric: 'Shoulder ROM',
-                                value: metrics.leftShoulderAngle_ROM,
-                                expected: normative.flexion.optimal,
-                                deviation: deviation.percentage,
-                                severity: this.getSeverity(deviation.percentage),
-                                recommendation: this.getRecommendation('shoulder_rom', deviation)
-                            });
+                        if (Math.abs(metrics.torsoAngle || 0) > norm.torsoLeanMax) {
+                            discrepancies.push(this.createDiscrepancy('Torso Lean', 'medium', `Excessive torso lean (${Math.abs(metrics.torsoAngle || 0).toFixed(0)}°) detected as compensation.`, 'Engage core muscles and focus on isolating shoulder movement.'));
                         }
-                    }
+                        if ((metrics.shoulderSymmetryDifference || 0) > norm.symmetryDiffMax) {
+                             discrepancies.push(this.createDiscrepancy('Symmetry', 'medium', `Significant asymmetry (${metrics.shoulderSymmetryDifference.toFixed(0)}°) between left and right shoulder ROM.`, 'Incorporate unilateral exercises to strengthen the weaker side.'));
+                        }
+                        break;
+                    
+                    case 'knee_flexion':
+                        const flexion = metrics.leftKneeAngle_ROM || metrics.rightKneeAngle_ROM || 0;
+                         if (flexion < norm.flexion.min) {
+                            discrepancies.push(this.createDiscrepancy('Knee Flexion', 'low', `Squat depth (${flexion.toFixed(0)}°) is below the expected minimum of ${norm.flexion.min}°.`, 'Improve ankle and hip mobility; try box squats to a lower surface.'));
+                        }
+                         if ((metrics.kneeSymmetryDifference || 0) > norm.symmetryDiffMax) {
+                             discrepancies.push(this.createDiscrepancy('Symmetry', 'high', `Significant weight shift or asymmetry (${metrics.kneeSymmetryDifference.toFixed(0)}°) detected between knees.`, 'Focus on single-leg stability exercises like lunges and step-downs.'));
+                        }
+                        break;
                 }
-                
-                // Check symmetry
-                if (metrics.shoulderSymmetry && metrics.shoulderSymmetry < 0.8) {
-                    discrepancies.push({
-                        joint: 'Shoulders',
-                        metric: 'Symmetry',
-                        value: metrics.shoulderSymmetry,
-                        expected: 1.0,
-                        deviation: (1.0 - metrics.shoulderSymmetry) * 100,
-                        severity: 'medium',
-                        recommendation: 'Focus on bilateral shoulder exercises'
-                    });
-                }
-                
                 return discrepancies;
             }
-            
-            calculateDeviation(value, range) {
-                const optimal = range.optimal;
-                const deviation = Math.abs(value - optimal);
-                const percentage = (deviation / optimal) * 100;
-                const direction = value < optimal ? 'below' : 'above';
-                
-                return { deviation, percentage, direction };
-            }
-            
-            getSeverity(percentage) {
-                if (percentage > 25) return 'high';
-                if (percentage > 10) return 'medium';
-                return 'low';
-            }
-            
-            getRecommendation(metric, deviation) {
-                const recommendations = {
-                    hip_flexion: {
-                        below: 'Increase hip flexibility with seated forward bends',
-                        above: 'Strengthen hip stabilizers with bridge exercises'
-                    },
-                    shoulder_rom: {
-                        below: 'Improve shoulder mobility with wall slides and arm circles',
-                        above: 'Focus on controlled movements and stability exercises'
-                    },
-                    knee_flexion: {
-                        below: 'Practice deep squats and lunges to increase range',
-                        above: 'Strengthen quadriceps with wall sits'
-                    }
-                };
-                
-                if (recommendations[metric]) {
-                    return recommendations[metric][deviation.direction] || 'Consult physiotherapist';
-                }
-                return 'Monitor and maintain current exercise routine';
+
+            createDiscrepancy(metric, severity, issue, recommendation) {
+                return { metric, severity, issue, recommendation };
             }
         }
-
-        // Visualization and Rendering
+        
         class PoseRenderer {
-            constructor(canvas) {
-                this.canvas = canvas;
-                this.ctx = canvas.getContext('2d');
-            }
+            constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); }
             
-            render(keypoints, metrics, discrepancies) {
-                const videoWidth = video.videoWidth;
-                const videoHeight = video.videoHeight;
+            render(pose, metrics, discrepancies) {
+                this.canvas.width = video.videoWidth; this.canvas.height = video.videoHeight;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 
-                this.canvas.width = videoWidth;
-                this.canvas.height = videoHeight;
-                this.ctx.clearRect(0, 0, videoWidth, videoHeight);
-                
-                // Draw skeleton
-                this.drawSkeleton(keypoints);
-                
-                // Draw joints with color coding
-                keypoints.forEach(kp => {
-                    if (kp.score > CONFIG.confidenceThreshold) {
-                        const color = this.getJointColor(kp, discrepancies);
-                        this.drawJoint(kp.x, kp.y, color);
-                    }
-                });
-                
-                // Draw metrics overlay
-                this.drawMetricsOverlay(metrics);
-                
-                // Draw angle arcs
-                this.drawAngleArcs(keypoints, metrics);
-            }
-            
-            drawJoint(x, y, color) {
-                this.ctx.beginPath();
-                this.ctx.arc(x, y, 8, 0, 2 * Math.PI);
-                this.ctx.fillStyle = color;
-                this.ctx.fill();
-                this.ctx.strokeStyle = 'white';
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-            }
-            
-            drawSkeleton(keypoints) {
-                const connections = [
-                    ['nose', 'leftEye'], ['nose', 'rightEye'],
-                    ['leftEye', 'leftEar'], ['rightEye', 'rightEar'],
-                    ['leftShoulder', 'rightShoulder'],
-                    ['leftShoulder', 'leftElbow'], ['rightShoulder', 'rightElbow'],
-                    ['leftElbow', 'leftWrist'], ['rightElbow', 'rightWrist'],
-                    ['leftShoulder', 'leftHip'], ['rightShoulder', 'rightHip'],
-                    ['leftHip', 'rightHip'],
-                    ['leftHip', 'leftKnee'], ['rightHip', 'rightKnee'],
-                    ['leftKnee', 'leftAnkle'], ['rightKnee', 'rightAnkle']
-                ];
-                
+                if (isCalibrating) { this.drawTPoseSilhouette(); }
+
+                if (!pose) return;
+                const { keypoints } = pose;
+
+                const connections = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
                 this.ctx.strokeStyle = 'rgba(102, 126, 234, 0.7)';
                 this.ctx.lineWidth = 3;
                 
-                connections.forEach(([start, end]) => {
-                    const kp1 = keypoints.find(kp => kp.name === start);
-                    const kp2 = keypoints.find(kp => kp.name === end);
-                    
-                    if (kp1 && kp2 && kp1.score > CONFIG.confidenceThreshold && kp2.score > CONFIG.confidenceThreshold) {
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(kp1.x, kp1.y);
-                        this.ctx.lineTo(kp2.x, kp2.y);
-                        this.ctx.stroke();
+                connections.forEach(([i, j]) => {
+                    const kp1 = keypoints[i]; const kp2 = keypoints[j];
+                    if (kp1.score > CONFIG.confidenceThreshold && kp2.score > CONFIG.confidenceThreshold) {
+                        this.ctx.beginPath(); this.ctx.moveTo(kp1.x, kp1.y); this.ctx.lineTo(kp2.x, kp2.y); this.ctx.stroke();
+                    }
+                });
+                
+                keypoints.forEach(kp => {
+                    if (kp.score > CONFIG.confidenceThreshold) {
+                        this.drawJoint(kp.x, kp.y, '#667eea');
                     }
                 });
             }
-            
-            drawAngleArcs(keypoints, metrics) {
-                // Draw knee angle arc
-                const leftHip = keypoints.find(kp => kp.name === 'leftHip');
-                const leftKnee = keypoints.find(kp => kp.name === 'leftKnee');
-                const leftAnkle = keypoints.find(kp => kp.name === 'leftAnkle');
-                
-                if (leftHip && leftKnee && leftAnkle && metrics.leftKneeAngle) {
-                    this.drawAngleArc(leftKnee, leftHip, leftAnkle, metrics.leftKneeAngle);
-                }
+
+            drawJoint(x, y, color) {
+                this.ctx.beginPath(); this.ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                this.ctx.fillStyle = color; this.ctx.fill();
+                this.ctx.strokeStyle = 'white'; this.ctx.lineWidth = 2; this.ctx.stroke();
             }
-            
-            drawAngleArc(center, point1, point2, angle) {
-                const radius = 40;
-                const startAngle = Math.atan2(point1.y - center.y, point1.x - center.x);
-                const endAngle = Math.atan2(point2.y - center.y, point2.x - center.x);
+
+            drawTPoseSilhouette() {
+                const w = this.canvas.width; const h = this.canvas.height;
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.lineWidth = 5; this.ctx.setLineDash([10, 5]);
+
+                // Head
+                this.ctx.beginPath(); this.ctx.arc(w/2, h*0.2, 30, 0, 2 * Math.PI); this.ctx.stroke();
+                // Body
+                this.ctx.beginPath(); this.ctx.moveTo(w/2, h*0.2 + 30); this.ctx.lineTo(w/2, h*0.6); this.ctx.stroke();
+                // Arms
+                this.ctx.beginPath(); this.ctx.moveTo(w*0.25, h*0.4); this.ctx.lineTo(w*0.75, h*0.4); this.ctx.stroke();
+                // Legs
+                this.ctx.beginPath(); this.ctx.moveTo(w/2, h*0.6); this.ctx.lineTo(w*0.4, h*0.9); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.moveTo(w/2, h*0.6); this.ctx.lineTo(w*0.6, h*0.9); this.ctx.stroke();
                 
-                this.ctx.beginPath();
-                this.ctx.arc(center.x, center.y, radius, startAngle, endAngle);
-                this.ctx.strokeStyle = 'rgba(67, 233, 123, 0.8)';
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-                
-                // Draw angle text
-                this.ctx.font = 'bold 14px Arial';
-                this.ctx.fillStyle = 'white';
-                this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                this.ctx.lineWidth = 3;
-                this.ctx.strokeText(`${Math.round(angle)}°`, center.x + radius + 10, center.y);
-                this.ctx.fillText(`${Math.round(angle)}°`, center.x + radius + 10, center.y);
-            }
-            
-            drawMetricsOverlay(metrics) {
-                let y = 30;
-                this.ctx.font = 'bold 16px Arial';
-                this.ctx.fillStyle = 'white';
-                this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                this.ctx.lineWidth = 3;
-                
-                const displayMetrics = [
-                    { label: 'Neck', value: metrics.neckAngle },
-                    { label: 'L-Shoulder', value: metrics.leftShoulderAngle },
-                    { label: 'L-Knee', value: metrics.leftKneeAngle }
-                ];
-                
-                displayMetrics.forEach(m => {
-                    if (m.value !== undefined) {
-                        const text = `${m.label}: ${Math.round(m.value)}°`;
-                        this.ctx.strokeText(text, 10, y);
-                        this.ctx.fillText(text, 10, y);
-                        y += 25;
-                    }
-                });
-            }
-            
-            getJointColor(keypoint, discrepancies) {
-                const hasIssue = discrepancies.some(d => 
-                    d.joint.includes(Object.keys(CONFIG.jointMap).find(
-                        key => CONFIG.jointMap[key] === keypoint.name
-                    ))
-                );
-                
-                if (hasIssue) {
-                    const severity = discrepancies.find(d => 
-                        d.joint.includes(Object.keys(CONFIG.jointMap).find(
-                            key => CONFIG.jointMap[key] === keypoint.name
-                        ))
-                    )?.severity;
-                    
-                    if (severity === 'high') return '#f5576c';
-                    if (severity === 'medium') return '#ffc107';
-                    return '#43e97b';
-                }
-                
-                return '#667eea';
+                this.ctx.setLineDash([]);
             }
         }
 
-        // Data Recording and Export
         class DataRecorder {
-            constructor() {
-                this.frames = [];
-                this.sessionId = this.generateSessionId();
-            }
+            constructor() { this.frames = []; }
+            addFrame(frameData) { this.frames.push({ timestamp: new Date().toISOString(), ...frameData }); }
             
-            generateSessionId() {
-                const date = new Date();
-                const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
-                const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');
-                return `S${dateStr}_${timeStr}`;
-            }
-            
-            addFrame(frameData) {
-                this.frames.push({
-                    timestamp: new Date().toISOString(),
-                    frame_index: this.frames.length,
-                    ...frameData
-                });
-            }
-            
-            exportNDJSON() {
-                return this.frames.map(f => JSON.stringify(f)).join('\n');
-            }
-            
-            exportJSON() {
-                return JSON.stringify({
-                    session_id: this.sessionId,
-                    task: sessionData.task,
-                    orientation: sessionData.orientation,
-                    duration: (sessionData.endTime - sessionData.startTime) / 1000,
-                    frame_count: this.frames.length,
-                    frames: this.frames,
-                    summary: this.generateSummary()
-                }, null, 2);
+            exportJSON(sessionData) {
+                const data = { ...sessionData, frames: this.frames, summary: this.generateSummary() };
+                return JSON.stringify(data, null, 2);
             }
             
             exportCSV() {
                 if (this.frames.length === 0) return '';
-                
-                const headers = ['timestamp', 'frame_index'];
-                const metricsKeys = Object.keys(this.frames[0].metrics || {});
-                headers.push(...metricsKeys);
-                
+                const headers = ['timestamp', ...Object.keys(this.frames[0].metrics)];
                 const rows = this.frames.map(f => {
-                    const row = [f.timestamp, f.frame_index];
-                    metricsKeys.forEach(key => {
-                        row.push(f.metrics[key] || '');
-                    });
+                    const row = [f.timestamp];
+                    Object.keys(this.frames[0].metrics).forEach(key => row.push(f.metrics[key] || ''));
                     return row.join(',');
                 });
-                
                 return [headers.join(','), ...rows].join('\n');
             }
             
             generateSummary() {
-                const summary = {
-                    total_frames: this.frames.length,
-                    average_confidence: 0,
-                    metrics_summary: {},
-                    discrepancy_count: 0,
-                    recommendations: []
-                };
-                
-                // Calculate averages
-                const metricTotals = {};
-                let confidenceTotal = 0;
-                let discrepancySet = new Set();
-                
+                const summary = { metrics_summary: {}, discrepancy_summary: [] };
+                const metricTotals = {}; let discrepancySet = new Map();
+
                 this.frames.forEach(f => {
-                    if (f.pose_confidence) {
-                        confidenceTotal += f.pose_confidence;
-                    }
-                    
-                    if (f.metrics) {
-                        Object.entries(f.metrics).forEach(([key, value]) => {
-                            if (typeof value === 'number') {
-                                if (!metricTotals[key]) {
-                                    metricTotals[key] = { sum: 0, count: 0, min: value, max: value };
-                                }
-                                metricTotals[key].sum += value;
-                                metricTotals[key].count++;
-                                metricTotals[key].min = Math.min(metricTotals[key].min, value);
-                                metricTotals[key].max = Math.max(metricTotals[key].max, value);
-                            }
-                        });
-                    }
-                    
-                    if (f.discrepancies) {
-                        f.discrepancies.forEach(d => {
-                            discrepancySet.add(d.recommendation);
-                        });
-                    }
+                    Object.entries(f.metrics).forEach(([key, value]) => {
+                        if (typeof value === 'number' && !isNaN(value)) {
+                            if (!metricTotals[key]) { metricTotals[key] = { sum: 0, count: 0, min: value, max: value }; }
+                            metricTotals[key].sum += value; metricTotals[key].count++;
+                            metricTotals[key].min = Math.min(metricTotals[key].min, value);
+                            metricTotals[key].max = Math.max(metricTotals[key].max, value);
+                        }
+                    });
+                    f.discrepancies.forEach(d => {
+                        if (!discrepancySet.has(d.issue)) discrepancySet.set(d.issue, d);
+                    });
                 });
-                
-                summary.average_confidence = confidenceTotal / this.frames.length;
                 
                 Object.entries(metricTotals).forEach(([key, data]) => {
                     summary.metrics_summary[key] = {
-                        average: data.sum / data.count,
-                        min: data.min,
-                        max: data.max,
-                        range: data.max - data.min
+                        average: data.sum / data.count, min: data.min,
+                        max: data.max, range: data.max - data.min
                     };
                 });
                 
-                summary.recommendations = Array.from(discrepancySet);
-                summary.discrepancy_count = discrepancySet.size;
-                
+                summary.discrepancy_summary = Array.from(discrepancySet.values());
                 return summary;
             }
+
+            reset() { this.frames = []; }
         }
 
-        // Report Generator
         class ReportGenerator {
-            generatePDF(data) {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                
-                // Header
-                doc.setFontSize(20);
-                doc.text('Physio-Mimica Movement Analysis Report', 20, 20);
-                
-                doc.setFontSize(12);
-                doc.text(`Session ID: ${data.session_id}`, 20, 35);
-                doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 42);
-                doc.text(`Task: ${data.task}`, 20, 49);
-                doc.text(`Duration: ${data.duration}s`, 20, 56);
-                
-                // Summary Statistics
-                doc.setFontSize(16);
-                doc.text('Summary Statistics', 20, 75);
-                
-                doc.setFontSize(11);
-                let y = 85;
-                
-                if (data.summary && data.summary.metrics_summary) {
-                    Object.entries(data.summary.metrics_summary).forEach(([key, stats]) => {
-                        if (y > 250) {
-                            doc.addPage();
-                            y = 20;
-                        }
-                        doc.text(`${key}:`, 25, y);
-                        doc.text(`Avg: ${stats.average.toFixed(2)}, Range: ${stats.min.toFixed(2)}-${stats.max.toFixed(2)}`, 70, y);
-                        y += 7;
-                    });
-                }
-                
-                // Recommendations
-                if (data.summary && data.summary.recommendations && data.summary.recommendations.length > 0) {
-                    if (y > 230) {
-                        doc.addPage();
-                        y = 20;
-                    }
-                    
-                    doc.setFontSize(16);
-                    doc.text('Recommendations', 20, y + 15);
-                    y += 25;
-                    
-                    doc.setFontSize(11);
-                    data.summary.recommendations.forEach((rec, i) => {
-                        if (y > 270) {
-                            doc.addPage();
-                            y = 20;
-                        }
-                        doc.text(`${i + 1}. ${rec}`, 25, y);
-                        y += 10;
-                    });
-                }
-                
-                // Footer
-                doc.setFontSize(9);
-                doc.text('Generated by Physio-Mimica © 2025', 20, 285);
-                
-                return doc;
-            }
-            
             generateHTMLReport(data) {
                 let html = `
-                    <h3>Session Summary</h3>
                     <p><strong>Session ID:</strong> ${data.session_id}</p>
                     <p><strong>Task:</strong> ${data.task}</p>
-                    <p><strong>Duration:</strong> ${data.duration}s</p>
-                    <p><strong>Frames Captured:</strong> ${data.frame_count}</p>
-                `;
+                    <p><strong>Duration:</strong> ${data.duration.toFixed(2)}s</p>
+                    <h3>Discrepancy Summary</h3>`;
                 
-                if (data.summary && data.summary.metrics_summary) {
-                    html += '<h3>Metrics Analysis</h3><ul>';
-                    Object.entries(data.summary.metrics_summary).forEach(([key, stats]) => {
-                        html += `<li><strong>${key}:</strong> 
-                            Average: ${stats.average.toFixed(2)}°, 
-                            Range: ${stats.min.toFixed(2)}° - ${stats.max.toFixed(2)}°</li>`;
+                if (data.summary.discrepancy_summary.length > 0) {
+                    html += '<ul>';
+                    data.summary.discrepancy_summary.forEach(d => {
+                        html += `<li><strong>${d.metric} (${d.severity}):</strong> ${d.issue} <em>${d.recommendation}</em></li>`;
                     });
                     html += '</ul>';
+                } else {
+                    html += '<p>No significant discrepancies detected. Good job!</p>';
                 }
                 
-                if (data.summary && data.summary.recommendations && data.summary.recommendations.length > 0) {
-                    html += '<h3>Recommendations</h3><ol>';
-                    data.summary.recommendations.forEach(rec => {
-                        html += `<li>${rec}</li>`;
-                    });
-                    html += '</ol>';
-                }
-                
+                html += '<h3>Metrics Analysis</h3><ul>';
+                Object.entries(data.summary.metrics_summary).forEach(([key, stats]) => {
+                    if (key.includes('Angle') || key.includes('Symmetry'))
+                    html += `<li><strong>${key}:</strong> 
+                        Avg: ${stats.average.toFixed(2)}, 
+                        Range: ${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}</li>`;
+                });
+                html += '</ul>';
                 return html;
             }
-        }
 
-        // Position Detection System
-        class PositionDetector {
-            detectOrientation(keypoints) {
-                const nose = keypoints.find(kp => kp.name === 'nose');
-                const leftEar = keypoints.find(kp => kp.name === 'leftEar');
-                const rightEar = keypoints.find(kp => kp.name === 'rightEar');
-                const leftShoulder = keypoints.find(kp => kp.name === 'leftShoulder');
-                const rightShoulder = keypoints.find(kp => kp.name === 'rightShoulder');
+            renderCharts(data) {
+                const task = data.task;
+                let keyMetric = null;
+                if (task === 'knee_flexion') keyMetric = 'leftKneeAngle';
+                else if (task === 'shoulder_rom') keyMetric = 'leftShoulderAngle';
                 
-                if (!nose || !leftShoulder || !rightShoulder) {
-                    return 'unknown';
-                }
-                
-                const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
-                const shoulderHeight = Math.abs(leftShoulder.y - rightShoulder.y);
-                
-                // Check if lying down (shoulders at similar height)
-                if (shoulderHeight < shoulderWidth * 0.2) {
-                    // Check if supine or prone
-                    if (leftEar && rightEar) {
-                        const earVisible = (leftEar.score > 0.5 && rightEar.score > 0.5);
-                        if (earVisible) {
-                            return 'supine';
-                        }
-                    }
-                    
-                    // Check face visibility
-                    const faceKeypoints = ['nose', 'leftEye', 'rightEye', 'leftEar', 'rightEar'];
-                    const visibleFacePoints = keypoints.filter(kp => 
-                        faceKeypoints.includes(kp.name) && kp.score > 0.5
-                    ).length;
-                    
-                    if (visibleFacePoints < 2) {
-                        return 'prone';
-                    }
-                    
-                    return 'side-lying';
-                }
-                
-                // Standing or sitting detection
-                const hips = keypoints.filter(kp => kp.name.includes('Hip'));
-                const knees = keypoints.filter(kp => kp.name.includes('Knee'));
-                
-                if (hips.length === 2 && knees.length === 2) {
-                    const hipY = (hips[0].y + hips[1].y) / 2;
-                    const kneeY = (knees[0].y + knees[1].y) / 2;
-                    const torsoLength = Math.abs(nose.y - hipY);
-                    const thighLength = Math.abs(hipY - kneeY);
-                    
-                    if (thighLength < torsoLength * 0.3) {
-                        return 'sitting';
-                    }
-                }
-                
-                return 'standing';
-            }
-            
-            adjustCoordinatesForOrientation(joints, orientation) {
-                if (orientation === 'supine' || orientation === 'prone') {
-                    // Rotate coordinate system for lying positions
-                    Object.keys(joints).forEach(key => {
-                        const joint = joints[key];
-                        const temp = joint.y;
-                        joint.y = joint.z || 0;
-                        joint.z = temp;
+                // Time Series Chart
+                if (keyMetric) {
+                    const labels = data.frames.map((_, i) => i);
+                    const chartData = data.frames.map(f => f.metrics[keyMetric]);
+                    if (window.myTimeSeriesChart) window.myTimeSeriesChart.destroy();
+                    window.myTimeSeriesChart = new Chart(document.getElementById('timeSeriesChart'), {
+                        type: 'line',
+                        data: { labels, datasets: [{ label: keyMetric, data: chartData, borderColor: '#667eea', tension: 0.1 }] },
+                        options: { responsive: true, plugins: { title: { display: true, text: 'Joint Angle Over Time' }}}
                     });
                 }
-                return joints;
+
+                // Symmetry Chart
+                const summary = data.summary.metrics_summary;
+                let symmLabels = [], symmData = [];
+                if (summary.leftShoulderAngle_ROM && summary.rightShoulderAngle_ROM) {
+                    symmLabels = ['Left Shoulder ROM', 'Right Shoulder ROM'];
+                    symmData = [summary.leftShoulderAngle_ROM.range, summary.rightShoulderAngle_ROM.range];
+                } else if (summary.leftKneeAngle_ROM && summary.rightKneeAngle_ROM) {
+                    symmLabels = ['Left Knee ROM', 'Right Knee ROM'];
+                    symmData = [summary.leftKneeAngle_ROM.range, summary.rightKneeAngle_ROM.range];
+                }
+
+                if (symmLabels.length > 0) {
+                    if (window.mySymmetryChart) window.mySymmetryChart.destroy();
+                    window.mySymmetryChart = new Chart(document.getElementById('symmetryChart'), {
+                        type: 'bar',
+                        data: { labels: symmLabels, datasets: [{ label: 'Range of Motion (°)', data: symmData, backgroundColor: ['#764ba2', '#667eea'] }] },
+                        options: { responsive: true, plugins: { title: { display: true, text: 'Bilateral Symmetry' }}}
+                    });
+                }
             }
         }
-
+        
         // Initialize components
         const jointProcessor = new JointProcessor();
         const metricsCalculator = new MetricsCalculator();
         const discrepancyAnalyzer = new DiscrepancyAnalyzer();
         const dataRecorder = new DataRecorder();
         const reportGenerator = new ReportGenerator();
-        const positionDetector = new PositionDetector();
         let poseRenderer = null;
+        let sessionData = {};
 
-        // UI Event Handlers
+        // --- Core Application Logic ---
         document.getElementById('startBtn').addEventListener('click', startCamera);
         document.getElementById('calibrateBtn').addEventListener('click', calibrate);
         document.getElementById('recordBtn').addEventListener('click', startRecording);
@@ -1240,258 +802,159 @@
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: CONFIG.fps }
-                    }
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: CONFIG.fps } }
                 });
-                
                 video.srcObject = stream;
                 await video.play();
                 
-                // Initialize pose detector
-                const detectorConfig = {
-                    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-                    enableSmoothing: true,
-                    minPoseScore: 0.25
-                };
-                
-                detector = await poseDetection.createDetector(
-                    poseDetection.SupportedModels.MoveNet,
-                    detectorConfig
-                );
-                
-                // Initialize renderer
+                const detectorConfig = { modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER }; // Upgraded Model
+                detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig);
                 poseRenderer = new PoseRenderer(document.getElementById('canvas'));
                 
-                // Update UI
                 document.getElementById('startBtn').disabled = true;
-                document.getElementById('calibrateBtn').disabled = false;
-                document.getElementById('recordBtn').disabled = false;
-                document.getElementById('statusText').textContent = 'Camera Active';
-                document.getElementById('statusIndicator').className = 'status-indicator status-active';
+                updateStatus('Validating Position...', 'status-validating');
                 
-                // Start pose detection loop
                 detectPose();
                 
-            } catch (error) {
-                console.error('Error accessing camera:', error);
-                alert('Failed to access camera. Please ensure camera permissions are granted.');
-            }
+            } catch (error) { console.error('Error starting camera:', error); alert('Failed to start camera.'); }
         }
         
         function calibrate() {
-            alert('Stand in T-pose for 3 seconds for calibration...');
+            if (!isPositionValid) { alert('Please ensure you are fully visible in the frame before calibrating.'); return; }
+            updateStatus('Calibrating... Hold T-Pose', 'status-validating');
+            isCalibrating = true;
+            
             setTimeout(() => {
+                isCalibrating = false;
                 if (lastPose) {
-                    calibrationData = lastPose;
-                    alert('Calibration complete!');
+                    calibrationData.pose = lastPose;
+                    // TODO: Calculate and store anatomical ratios
+                    document.getElementById('recordBtn').disabled = false;
+                    updateStatus('Calibration Complete. Ready to Record.', 'status-active');
+                } else {
+                    updateStatus('Calibration Failed. Pose not detected.', 'status-idle');
                 }
-            }, 3000);
+            }, 5000); // 5 seconds for calibration
         }
         
         function startRecording() {
+            dataRecorder.reset();
+            metricsCalculator.reset();
             isRecording = true;
             sessionData = {
-                id: dataRecorder.sessionId,
+                session_id: `S${new Date().toISOString().replace(/[-:.]/g, '')}`,
                 task: document.getElementById('taskSelect').value,
                 orientation: document.getElementById('orientationSelect').value,
-                startTime: Date.now(),
-                frames: [],
-                metrics: [],
-                discrepancies: []
+                startTime: Date.now()
             };
             
             document.getElementById('recordBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
-            document.getElementById('calibrateBtn').disabled = true;
-            document.getElementById('statusText').textContent = 'Recording';
-            document.getElementById('statusIndicator').className = 'status-indicator status-recording';
-            document.getElementById('sessionId').textContent = sessionData.id;
-            
-            // Reset metrics calculator ROM tracking
-            metricsCalculator.romTracking = {};
+            document.getElementById('reportBtn').disabled = true;
+            document.getElementById('sessionId').textContent = sessionData.session_id;
+            updateStatus('Recording...', 'status-recording');
         }
         
         function stopRecording() {
             isRecording = false;
             sessionData.endTime = Date.now();
+            sessionData.duration = (sessionData.endTime - sessionData.startTime) / 1000;
             
             document.getElementById('recordBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
-            document.getElementById('calibrateBtn').disabled = false;
             document.getElementById('reportBtn').disabled = false;
-            document.getElementById('statusText').textContent = 'Recording Stopped';
-            document.getElementById('statusIndicator').className = 'status-indicator status-active';
+            updateStatus('Recording Stopped', 'status-active');
         }
-        
-        let lastPose = null;
-        let previousJoints = null;
-        let lastMetricUpdate = Date.now();
         
         async function detectPose() {
             if (!detector) return;
             
-            try {
-                const poses = await detector.estimatePoses(video);
+            const poses = await detector.estimatePoses(video, { flipHorizontal: false });
+            
+            if (poses.length > 0) {
+                lastPose = poses[0];
+                validatePosition(lastPose);
                 
-                if (poses.length > 0) {
-                    const pose = poses[0];
-                    lastPose = pose;
-                    
-                    // Process keypoints
-                    const processedData = jointProcessor.processKeypoints(pose.keypoints);
-                    let { joints, bones } = processedData;
-                    
-                    // Detect orientation
-                    const detectedOrientation = positionDetector.detectOrientation(pose.keypoints);
-                    
-                    // Adjust coordinates based on orientation
-                    joints = positionDetector.adjustCoordinatesForOrientation(joints, detectedOrientation);
-                    
-                    // Smooth joints
-                    joints = jointProcessor.smoothJoints(joints);
-                    
-                    // Calculate metrics
-                    const deltaTime = (Date.now() - lastMetricUpdate) / 1000;
-                    const metrics = metricsCalculator.calculateMetrics(joints, previousJoints, deltaTime);
-                    
-                    // Analyze discrepancies
-                    const discrepancies = discrepancyAnalyzer.analyze(
-                        metrics,
-                        document.getElementById('taskSelect').value,
-                        detectedOrientation
-                    );
-                    
-                    // Update visualization
-                    if (poseRenderer) {
-                        poseRenderer.render(pose.keypoints, metrics, discrepancies);
-                    }
-                    
-                    // Update UI metrics
-                    updateMetricsDisplay(metrics, discrepancies);
-                    
-                    // Record frame if recording
-                    if (isRecording) {
-                        dataRecorder.addFrame({
-                            joints,
-                            bones,
-                            metrics,
-                            discrepancies,
-                            pose_confidence: pose.score,
-                            detected_orientation: detectedOrientation
-                        });
-                        frameCount++;
-                    }
-                    
-                    // Update for next frame
-                    previousJoints = joints;
-                    lastMetricUpdate = Date.now();
+                const joints = jointProcessor.processKeypoints(lastPose.keypoints);
+                const deltaTime = (Date.now() - lastFrameTime) / 1000;
+                const metrics = metricsCalculator.calculateMetrics(joints, previousMetrics.joints, deltaTime);
+                const discrepancies = discrepancyAnalyzer.analyze(metrics, document.getElementById('taskSelect').value);
+                
+                if (poseRenderer) { poseRenderer.render(lastPose, metrics, discrepancies); }
+                updateMetricsDisplay(metrics);
+                updateDiscrepancyDisplay(discrepancies);
+                
+                if (isRecording) {
+                    dataRecorder.addFrame({ joints, metrics, discrepancies });
+                    frameCount++;
                 }
-                
-                // Update FPS counter
-                const currentTime = Date.now();
-                fps = Math.round(1000 / (currentTime - lastFrameTime));
-                lastFrameTime = currentTime;
-                
-                document.getElementById('frameCounter').textContent = `${frameCount} frames`;
-                document.getElementById('fpsCounter').textContent = `${fps} FPS`;
-                
-            } catch (error) {
-                console.error('Pose detection error:', error);
             }
             
+            updateFPS();
             animationId = requestAnimationFrame(detectPose);
         }
+
+        function validatePosition(pose) {
+            if (isPositionValid) return;
+            const confidentKeypoints = pose.keypoints.filter(kp => kp.score > CONFIG.confidenceThreshold).length;
+            if (confidentKeypoints >= CONFIG.minKeypointsForValidPose) {
+                isPositionValid = true;
+                document.getElementById('calibrateBtn').disabled = false;
+                updateStatus('Position OK. Please Calibrate.', 'status-active');
+            }
+        }
         
-        function updateMetricsDisplay(metrics, discrepancies) {
+        function updateMetricsDisplay(metrics) {
             const container = document.getElementById('metricsContainer');
-            const metricItems = container.querySelectorAll('.metric-item');
-            
-            // Update existing metric displays
-            if (metrics.neckAngle !== undefined) {
-                metricItems[0].querySelector('.metric-value').innerHTML = 
-                    `${Math.round(metrics.neckAngle)}<span class="metric-unit">°</span>`;
-            }
-            if (metrics.leftShoulderAngle !== undefined) {
-                metricItems[1].querySelector('.metric-value').innerHTML = 
-                    `${Math.round(metrics.leftShoulderAngle)}<span class="metric-unit">°</span>`;
-            }
-            if (metrics.leftElbowAngle !== undefined) {
-                metricItems[2].querySelector('.metric-value').innerHTML = 
-                    `${Math.round(metrics.leftElbowAngle)}<span class="metric-unit">°</span>`;
-            }
-            if (metrics.leftHipAngle !== undefined) {
-                metricItems[3].querySelector('.metric-value').innerHTML = 
-                    `${Math.round(metrics.leftHipAngle)}<span class="metric-unit">°</span>`;
-            }
-            if (metrics.leftKneeAngle !== undefined) {
-                metricItems[4].querySelector('.metric-value').innerHTML = 
-                    `${Math.round(metrics.leftKneeAngle)}<span class="metric-unit">°</span>`;
-            }
-            
-            // Update discrepancy display
-            const discrepancyContainer = document.getElementById('discrepancyContainer');
-            discrepancyContainer.innerHTML = '';
-            
+            container.innerHTML = ''; // Clear previous metrics
+            const metricsToShow = {
+                "L Shoulder Angle": metrics.leftShoulderAngle,
+                "R Shoulder Angle": metrics.rightShoulderAngle,
+                "L Knee Angle": metrics.leftKneeAngle,
+                "R Knee Angle": metrics.rightKneeAngle,
+                "Torso Lean": metrics.torsoAngle,
+                "Postural Sway": metrics.posturalSway
+            };
+
+            Object.entries(metricsToShow).forEach(([label, value]) => {
+                if (value !== undefined && value !== null) {
+                    const item = document.createElement('div');
+                    item.className = 'metric-item';
+                    item.innerHTML = `
+                        <div class="metric-label">${label}</div>
+                        <div class="metric-value">${value.toFixed(1)}<span class="metric-unit">${label.includes('Angle') ? '°' : ''}</span></div>
+                    `;
+                    container.appendChild(item);
+                }
+            });
+        }
+        
+        function updateDiscrepancyDisplay(discrepancies) {
+            const container = document.getElementById('discrepancyContainer');
+            container.innerHTML = '';
             discrepancies.forEach(d => {
                 const item = document.createElement('div');
                 item.className = `discrepancy-item severity-${d.severity}`;
-                item.innerHTML = `
-                    <strong>${d.metric}:</strong> ${Math.round(d.deviation)}% deviation
-                    <br><small>${d.recommendation}</small>
-                `;
-                discrepancyContainer.appendChild(item);
+                item.innerHTML = `<strong>${d.metric}:</strong> ${d.issue}`;
+                container.appendChild(item);
             });
-            
-            // Update progress bar if recording
-            if (isRecording && sessionData.startTime) {
-                const elapsed = (Date.now() - sessionData.startTime) / 1000;
-                const maxDuration = 60; // 60 seconds max recording
-                const progress = Math.min((elapsed / maxDuration) * 100, 100);
-                
-                document.getElementById('progressBar').style.width = `${progress}%`;
-                document.getElementById('progressText').textContent = `${Math.round(progress)}%`;
-            }
         }
         
         function generateReport() {
-            const data = {
-                session_id: sessionData.id,
-                task: sessionData.task,
-                orientation: sessionData.orientation,
-                duration: (sessionData.endTime - sessionData.startTime) / 1000,
-                frame_count: dataRecorder.frames.length,
-                frames: dataRecorder.frames,
-                summary: dataRecorder.generateSummary()
-            };
-            
-            const htmlReport = reportGenerator.generateHTMLReport(data);
-            document.getElementById('reportContent').innerHTML = htmlReport;
+            const data = { ...sessionData, frames: dataRecorder.frames, summary: dataRecorder.generateSummary() };
+            document.getElementById('reportContent').innerHTML = reportGenerator.generateHTMLReport(data);
+            reportGenerator.renderCharts(data);
             document.getElementById('reportModal').style.display = 'flex';
         }
         
         function exportReport(format) {
-            const data = {
-                session_id: sessionData.id,
-                task: sessionData.task,
-                orientation: sessionData.orientation,
-                duration: (sessionData.endTime - sessionData.startTime) / 1000,
-                frame_count: dataRecorder.frames.length,
-                frames: dataRecorder.frames,
-                summary: dataRecorder.generateSummary()
-            };
-            
-            if (format === 'pdf') {
-                const pdf = reportGenerator.generatePDF(data);
-                pdf.save(`physio_mimica_${data.session_id}.pdf`);
-            } else if (format === 'json') {
-                const json = dataRecorder.exportJSON();
-                downloadFile(json, `physio_mimica_${data.session_id}.json`, 'application/json');
+            const data = { ...sessionData, frames: dataRecorder.frames, summary: dataRecorder.generateSummary() };
+            const filename = `physio_mimica_${sessionData.session_id}`;
+
+            if (format === 'json') {
+                downloadFile(JSON.stringify(data, null, 2), `${filename}.json`, 'application/json');
             } else if (format === 'csv') {
-                const csv = dataRecorder.exportCSV();
-                downloadFile(csv, `physio_mimica_${data.session_id}.csv`, 'text/csv');
+                downloadFile(dataRecorder.exportCSV(), `${filename}.csv`, 'text/csv');
             }
         }
         
@@ -1499,24 +962,28 @@
             const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
+            a.href = url; a.download = filename; a.click();
             URL.revokeObjectURL(url);
         }
-        
-        function closeModal() {
-            document.getElementById('reportModal').style.display = 'none';
+
+        function updateStatus(text, className) {
+            document.getElementById('statusText').textContent = text;
+            document.getElementById('statusIndicator').className = `status-indicator ${className}`;
         }
         
-        // Cleanup on page unload
+        function updateFPS() {
+            const now = Date.now();
+            fps = Math.round(1000 / (now - lastFrameTime));
+            lastFrameTime = now;
+            document.getElementById('frameCounter').textContent = `${frameCount} frames`;
+            document.getElementById('fpsCounter').textContent = `${fps} FPS`;
+        }
+
+        function closeModal() { document.getElementById('reportModal').style.display = 'none'; }
+        
         window.addEventListener('beforeunload', () => {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
+            if (animationId) cancelAnimationFrame(animationId);
+            if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
         });
     </script>
 </body>

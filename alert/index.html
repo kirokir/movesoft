@@ -1,0 +1,2159 @@
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<!--
+  Alert Jar - Lightweight PWA-style Web App
+  Version: v1.0
+  Created: 2025-10-08
+  
+  Usage:
+  - Assets/Liabilities: Record income/expenses via voice or text
+  - Diary: Journal entries with auto-tagging
+  - To-Do: Task management with auto-logging to diary
+  - Calendar: View entries by date
+  - All data stored locally (IndexedDB)
+  - Export/Import: JSON and CSV format
+  
+  Keyboard shortcuts:
+  - Arrow Left/Right: Switch tabs
+  - Ctrl+H: Show help
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="description" content="Alert Jar - Personal finance and diary tracker">
+<title>Alert Jar</title>
+<style>
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --bg: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --shadow: rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+header {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.help-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  color: var(--text-secondary);
+}
+
+.help-btn:hover {
+  background: var(--bg-secondary);
+}
+
+nav {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: var(--bg-secondary);
+}
+
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tab-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+main {
+  min-height: calc(100vh - 150px);
+  padding: 1rem 0;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.split-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .split-view {
+    grid-template-columns: 1fr;
+  }
+  
+  .diary-split {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.card h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.record-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem auto;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.record-btn:hover {
+  background: var(--primary-dark);
+  transform: scale(1.05);
+}
+
+.record-btn.recording {
+  background: var(--danger);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.transcription {
+  min-height: 60px;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: 0.375rem;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.transcription.active {
+  color: var(--text);
+  border: 1px solid var(--primary);
+}
+
+.input-group {
+  margin: 1rem 0;
+}
+
+input[type="text"],
+input[type="datetime-local"],
+textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-small {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.totals {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.total-card {
+  flex: 1;
+  min-width: 120px;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 0.375rem;
+  text-align: center;
+}
+
+.total-card .label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.total-card .amount {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.total-card.asset .amount {
+  color: var(--success);
+}
+
+.total-card.liability .amount {
+  color: var(--danger);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tag {
+  padding: 0.25rem 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.tag:hover, .tag.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.entries {
+  margin-top: 1rem;
+}
+
+.entry {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  margin-bottom: 0.75rem;
+  background: var(--bg);
+}
+
+.entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.entry-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.entry-amount {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.entry-amount.asset {
+  color: var(--success);
+}
+
+.entry-amount.liability {
+  color: var(--danger);
+}
+
+.entry-text {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.diary-split {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .diary-split {
+    grid-template-columns: 1fr;
+  }
+  
+  .todo-toggle {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  #diary-tab .card:last-of-type {
+    display: none;
+  }
+}
+
+.todo-toggle {
+  display: none;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.todo-item.completed {
+  opacity: 0.6;
+}
+
+.todo-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.todo-content {
+  flex: 1;
+}
+
+.todo-title {
+  font-weight: 500;
+}
+
+.todo-due {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.todo-due.overdue {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.calendar {
+  margin-top: 1rem;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.calendar-day:hover {
+  background: var(--bg-secondary);
+}
+
+.calendar-day.today {
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.calendar-day.other-month {
+  opacity: 0.3;
+}
+
+.calendar-indicators {
+  display: flex;
+  gap: 2px;
+  margin-top: 0.25rem;
+}
+
+.calendar-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.calendar-indicator.asset {
+  background: var(--success);
+}
+
+.calendar-indicator.liability {
+  background: var(--danger);
+}
+
+.calendar-indicator.diary {
+  background: var(--info);
+}
+
+.calendar-indicator.todo {
+  background: var(--warning);
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal.active {
+  display: flex;
+}
+
+.modal-content {
+  background: var(--bg);
+  border-radius: 0.5rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: var(--text);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: slideIn 0.3s;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.toast.success {
+  background: var(--success);
+}
+
+.toast.error {
+  background: var(--danger);
+}
+
+.toast button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.search-bar {
+  margin-bottom: 1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+}
+
+.empty-state svg {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.warning-banner {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.export-section {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.export-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.hidden {
+  display: none !important;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-content">
+    <h1>Alert Jar</h1>
+    <button class="help-btn" aria-label="Help" title="Help (Ctrl+H)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </button>
+  </div>
+  <nav role="navigation">
+    <button class="tab-btn active" data-tab="assets" aria-label="Assets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"/>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span>Assets</span>
+    </button>
+    <button class="tab-btn" data-tab="liabilities" aria-label="Liabilities">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <span>Liabilities</span>
+    </button>
+    <button class="tab-btn" data-tab="diary" aria-label="Diary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      <span>Diary</span>
+    </button>
+    <button class="tab-btn" data-tab="calendar" aria-label="Calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      <span>Calendar</span>
+    </button>
+  </nav>
+</header>
+
+<main class="container">
+  <div id="assets-tab" class="tab-content active">
+    <div class="card">
+      <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Assets
+      </h2>
+      
+      <div id="speech-warning-asset" class="warning-banner hidden">
+        Speech recognition uses your browser's voice service which may send audio to external servers.
+      </div>
+      
+      <button id="record-asset" class="record-btn" aria-label="Record asset">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
+      
+      <div id="transcription-asset" class="transcription" role="status" aria-live="polite">
+        Tap microphone to record or type below
+      </div>
+      
+      <div class="input-group">
+        <input type="text" id="manual-asset" placeholder="E.g., Client from web dev 69k rupees" aria-label="Manual asset entry">
+      </div>
+      
+      <button id="add-asset" class="btn btn-primary">Add Asset</button>
+      
+      <div class="totals">
+        <div class="total-card asset">
+          <div class="label">Today</div>
+          <div class="amount" id="total-assets-today">₹0</div>
+        </div>
+        <div class="total-card asset">
+          <div class="label">Filtered</div>
+          <div class="amount" id="total-assets-filtered">₹0</div>
+        </div>
+      </div>
+      
+      <div id="tags-asset" class="tags"></div>
+      <div id="entries-asset" class="entries"></div>
+    </div>
+  </div>
+
+  <div id="liabilities-tab" class="tab-content">
+    <div class="card">
+      <h2>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        Liabilities
+      </h2>
+      
+      <div id="speech-warning-liability" class="warning-banner hidden">
+        Speech recognition uses your browser's voice service which may send audio to external servers.
+      </div>
+      
+      <button id="record-liability" class="record-btn" aria-label="Record liability">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
+      
+      <div id="transcription-liability" class="transcription" role="status" aria-live="polite">
+        Tap microphone to record or type below
+      </div>
+      
+      <div class="input-group">
+        <input type="text" id="manual-liability" placeholder="E.g., Food for friends 700" aria-label="Manual liability entry">
+      </div>
+      
+      <button id="add-liability" class="btn btn-primary">Add Liability</button>
+      
+      <div class="totals">
+        <div class="total-card liability">
+          <div class="label">Today</div>
+          <div class="amount" id="total-liabilities-today">₹0</div>
+        </div>
+        <div class="total-card liability">
+          <div class="label">Filtered</div>
+          <div class="amount" id="total-liabilities-filtered">₹0</div>
+        </div>
+      </div>
+      
+      <div id="tags-liability" class="tags"></div>
+      <div id="entries-liability" class="entries"></div>
+    </div>
+  </div>
+
+  <div id="diary-tab" class="tab-content">
+    <div class="diary-split">
+      <div class="card">
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          Diary
+        </h2>
+        
+        <div id="speech-warning-diary" class="warning-banner hidden">
+          Speech recognition uses your browser's voice service which may send audio to external servers.
+        </div>
+        
+        <button id="record-diary" class="record-btn" aria-label="Record diary entry">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+        </button>
+        
+        <div id="transcription-diary" class="transcription" role="status" aria-live="polite">
+          Tap microphone to record or type below
+        </div>
+        
+        <div class="input-group">
+          <textarea id="manual-diary" placeholder="Write your diary entry..." aria-label="Manual diary entry"></textarea>
+        </div>
+        
+        <button id="add-diary" class="btn btn-primary">Save Entry</button>
+        
+        <div class="search-bar">
+          <input type="text" id="search-diary" placeholder="Search diary..." aria-label="Search diary">
+        </div>
+        
+        <div id="tags-diary" class="tags"></div>
+        <div id="entries-diary" class="entries"></div>
+      </div>
+      
+      <button id="toggle-todo" class="btn btn-secondary todo-toggle">To-Do</button>
+      
+      <div class="card">
+        <h2>To-Do</h2>
+        
+        <div class="input-group">
+          <input type="text" id="todo-title" placeholder="Task title" aria-label="Task title">
+        </div>
+        <div class="input-group">
+          <input type="datetime-local" id="todo-due" aria-label="Due date and time">
+        </div>
+        <button id="add-todo" class="btn btn-primary">Add Task</button>
+        
+        <div style="margin-top: 1.5rem;">
+          <h3 style="font-size: 0.875rem; margin-bottom: 0.5rem;">Pending</h3>
+          <div id="todos-pending"></div>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+          <h3 style="font-size: 0.875rem; margin-bottom: 0.5rem;">Completed</h3>
+          <div id="todos-completed"></div>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+          <h3 style="font-size: 0.875rem; margin-bottom: 0.5rem; color: var(--danger);">Missed</h3>
+          <div id="todos-missed"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="calendar-tab" class="tab-content">
+    <div class="card">
+      <div class="calendar-header">
+        <h2 id="calendar-month"></h2>
+        <div class="calendar-nav">
+          <button id="prev-month" class="btn btn-secondary btn-small">‹</button>
+          <button id="today-btn" class="btn btn-secondary btn-small">Today</button>
+          <button id="next-month" class="btn btn-secondary btn-small">›</button>
+        </div>
+      </div>
+      
+      <div class="calendar">
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </div>
+      
+      <div class="export-section">
+        <h3>Export Data</h3>
+        <div class="export-buttons">
+          <button id="export-json" class="btn btn-secondary btn-small">Export JSON</button>
+          <button id="export-csv" class="btn btn-secondary btn-small">Export CSV</button>
+          <label class="btn btn-secondary btn-small" style="cursor: pointer;">
+            Import JSON
+            <input type="file" id="import-json" accept=".json" style="display: none;">
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="help-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Help & Privacy</h2>
+      <button class="modal-close" aria-label="Close">×</button>
+    </div>
+    <div>
+      <h3>Keyboard Shortcuts</h3>
+      <ul style="margin: 1rem 0; line-height: 2;">
+        <li><strong>Arrow Left/Right:</strong> Switch between tabs</li>
+        <li><strong>Ctrl+H:</strong> Show/hide this help</li>
+      </ul>
+      
+      <h3>Privacy Notice</h3>
+      <p style="margin: 1rem 0;">
+        <strong>Speech Recognition:</strong> When you use voice input, your browser may send audio to external services (Google, Apple, etc.) for processing. This app does not send any data to remote servers itself.
+      </p>
+      <p style="margin: 1rem 0;">
+        <strong>Data Storage:</strong> All your data is stored locally on your device using IndexedDB. Nothing is sent to any server. Use the export feature to backup your data.
+      </p>
+      
+      <h3>Usage Tips</h3>
+      <ul style="margin: 1rem 0; line-height: 2;">
+        <li>Speak naturally: "Client from web development 69k rupees"</li>
+        <li>Tags are extracted automatically from your text</li>
+        <li>Tasks checked off are auto-logged to diary</li>
+        <li>Tasks not completed by due date are marked as missed</li>
+        <li>Click calendar days to view entries for that date</li>
+      </ul>
+      
+      <h3>Amount Formats Supported</h3>
+      <ul style="margin: 1rem 0; line-height: 2;">
+        <li>69k or 69K = 69,000</li>
+        <li>69,000 or 69 000</li>
+        <li>₹69,000 or Rs 69k or INR 69,000</li>
+        <li>69 rupees or 69 rupee</li>
+        <li>Decimals: 699.50</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="day-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="day-modal-title"></h2>
+      <button class="modal-close" aria-label="Close">×</button>
+    </div>
+    <div id="day-modal-content"></div>
+  </div>
+</div>
+
+<script>
+// Configuration
+const CONFIG = {
+  DEFAULT_CURRENCY: '₹',
+  DB_NAME: 'alertjar-db',
+  DB_VERSION: 1,
+  TAG_MAP: ['food', 'rent', 'salary', 'client', 'web dev', 'transport', 'shopping', 'gift', 'health', 'misc'],
+  STOPWORDS: ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your', 'his', 'her', 'its', 'our', 'their']
+};
+
+// Database
+let db;
+
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+    
+    request.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains('entries')) {
+        const store = database.createObjectStore('entries', { keyPath: 'id' });
+        store.createIndex('date', 'date', { unique: false });
+        store.createIndex('type', 'type', { unique: false });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+    };
+  });
+}
+
+async function saveEntry(entry) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['entries'], 'readwrite');
+    const store = transaction.objectStore('entries');
+    const request = store.add(entry);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getEntries(filters = {}) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['entries'], 'readonly');
+    const store = transaction.objectStore('entries');
+    const request = store.getAll();
+    
+    request.onsuccess = () => {
+      let entries = request.result;
+      
+      if (filters.type) {
+        entries = entries.filter(e => e.type === filters.type);
+      }
+      if (filters.date) {
+        entries = entries.filter(e => e.date === filters.date);
+      }
+      if (filters.tags && filters.tags.length > 0) {
+        entries = entries.filter(e => 
+          e.tags && e.tags.some(tag => filters.tags.includes(tag))
+        );
+      }
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        entries = entries.filter(e => 
+          e.text.toLowerCase().includes(search) ||
+          (e.tags && e.tags.some(tag => tag.includes(search)))
+        );
+      }
+      
+      resolve(entries);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteEntry(id) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['entries'], 'readwrite');
+    const store = transaction.objectStore('entries');
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function updateEntry(id, updates) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['entries'], 'readwrite');
+    const store = transaction.objectStore('entries');
+    const getRequest = store.get(id);
+    
+    getRequest.onsuccess = () => {
+      const entry = getRequest.result;
+      Object.assign(entry, updates);
+      const updateRequest = store.put(entry);
+      updateRequest.onsuccess = () => resolve(entry);
+      updateRequest.onerror = () => reject(updateRequest.error);
+    };
+    getRequest.onerror = () => reject(getRequest.error);
+  });
+}
+
+// Utility functions
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function formatCurrency(amount) {
+  if (amount == null) return 'No amount';
+  return CONFIG.DEFAULT_CURRENCY + amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+}
+
+function parseAmount(text) {
+  const patterns = [
+    /([+-]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/g,
+    /(\d+(?:\.\d+)?\s*[kK])/g,
+    /₹?([+-]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/g,
+    /(?:Rs?|INR)\s+([+-]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi,
+    /([+-]?\d+(?:\.\d+)?)\s+(?:rupees?|rupee)/gi
+  ];
+  
+  let amounts = [];
+  
+  for (const pattern of patterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      let valueStr = match[1] || match[0];
+      let value = valueStr.replace(/[,\s]/g, '');
+      let num = parseFloat(value);
+      if (isNaN(num)) continue;
+      if (value.match(/[kK]$/)) {
+        num *= 1000;
+      }
+      if (!isNaN(num)) amounts.push(num);
+    }
+  }
+  
+  return amounts.length > 0 ? amounts[amounts.length - 1] : null;
+}
+
+function extractTags(text) {
+  const lower = text.toLowerCase();
+  const words = lower.split(/\s+/);
+  const tags = new Set();
+  
+  // Check tag map
+  for (const tag of CONFIG.TAG_MAP) {
+    if (lower.includes(tag)) {
+      tags.add(tag);
+    }
+  }
+  
+  // Extract from "from X" or "for X"
+  const fromMatch = lower.match(/(?:from|for)\s+([a-z\s]+?)(?:\s+\d|$)/i);
+  if (fromMatch) {
+    const phrase = fromMatch[1].trim();
+    if (phrase.length > 2) tags.add(phrase);
+  }
+  
+  // Extract meaningful words
+  for (const word of words) {
+    if (word.length > 3 && !CONFIG.STOPWORDS.includes(word) && !/\d/.test(word)) {
+      tags.add(word);
+    }
+  }
+  
+  // Extract phrases
+  for (let i = 0; i < words.length - 1; i++) {
+    const phrase = words[i] + ' ' + words[i + 1];
+    if (phrase.length > 5 && !CONFIG.STOPWORDS.includes(words[i]) && !CONFIG.STOPWORDS.includes(words[i + 1])) {
+      if (CONFIG.TAG_MAP.includes(phrase)) {
+        tags.add(phrase);
+      }
+    }
+  }
+  
+  return Array.from(tags).slice(0, 5);
+}
+
+function getLocalDate() {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
+}
+
+function getLocalTime() {
+  const now = new Date();
+  return now.toTimeString().split(' ')[0];
+}
+
+function formatDateTime(timestamp) {
+  return new Date(timestamp).toLocaleString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function showToast(message, type = 'info', actions = []) {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+  
+  for (const action of actions) {
+    const btn = document.createElement('button');
+    btn.textContent = action.label;
+    btn.onclick = () => {
+      action.handler();
+      toast.remove();
+    };
+    toast.appendChild(btn);
+  }
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => toast.remove(), 5000);
+}
+
+// Speech Recognition
+let recognition;
+let currentRecognitionType = null;
+let isVoice = false;
+
+function initSpeechRecognition() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    console.warn('Speech recognition not supported');
+    return false;
+  }
+  
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-IN';
+  
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    
+    const transcriptionEl = document.getElementById(`transcription-${currentRecognitionType}`);
+    if (transcriptionEl) {
+      transcriptionEl.textContent = transcript;
+      transcriptionEl.classList.add('active');
+    }
+    
+    if (event.results[event.results.length - 1].isFinal) {
+      isVoice = true;
+      const manualInput = document.getElementById(`manual-${currentRecognitionType}`);
+      if (manualInput) {
+        manualInput.value = transcript;
+      }
+    }
+  };
+  
+  recognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+    showToast('Speech recognition error: ' + event.error, 'error');
+    stopRecording();
+  };
+  
+  recognition.onend = () => {
+    stopRecording();
+  };
+  
+  return true;
+}
+
+function startRecording(type) {
+  if (!recognition) {
+    showToast('Speech recognition not available. Please type manually.', 'error');
+    return;
+  }
+  
+  currentRecognitionType = type;
+  const btn = document.getElementById(`record-${type}`);
+  const transcriptionEl = document.getElementById(`transcription-${type}`);
+  const warningEl = document.getElementById(`speech-warning-${type}`);
+  
+  if (warningEl) warningEl.classList.remove('hidden');
+  
+  btn.classList.add('recording');
+  transcriptionEl.textContent = 'Listening...';
+  transcriptionEl.classList.add('active');
+  isVoice = false;
+  
+  try {
+    recognition.start();
+  } catch (e) {
+    console.error('Failed to start recognition:', e);
+    stopRecording();
+    showToast('Failed to start recording. Ensure microphone permissions.', 'error');
+  }
+}
+
+function stopRecording() {
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch (e) {
+      // Already stopped
+    }
+  }
+  
+  if (currentRecognitionType) {
+    const btn = document.getElementById(`record-${currentRecognitionType}`);
+    if (btn) btn.classList.remove('recording');
+    currentRecognitionType = null;
+  }
+}
+
+// Entry Management
+async function addEntry(type, text) {
+  if (!text.trim()) {
+    showToast('Please enter some text', 'error');
+    return;
+  }
+  
+  let amount = parseAmount(text);
+  if (type === 'liability' && (text.toLowerCase().includes('refund') || text.toLowerCase().includes('return'))) {
+    amount = -(Math.abs(amount || 0));
+  }
+  
+  if (amount === null || amount === 0) {
+    if (!confirm('No amount detected. Save without amount?')) return;
+  }
+  
+  const tags = extractTags(text);
+  
+  const entry = {
+    id: uuid(),
+    type: type,
+    date: getLocalDate(),
+    time: getLocalTime(),
+    timestamp: Date.now(),
+    text: text.trim(),
+    amount: amount,
+    currency: amount ? CONFIG.DEFAULT_CURRENCY : null,
+    tags: tags,
+    source: isVoice ? 'voice' : 'manual'
+  };
+  
+  try {
+    await saveEntry(entry);
+    showToast('Entry saved!', 'success', [{
+      label: 'Undo',
+      handler: async () => {
+        await deleteEntry(entry.id);
+        await refreshEntries(type);
+        showToast('Entry removed', 'info');
+      }
+    }]);
+    
+    // Clear inputs
+    const manualInput = document.getElementById(`manual-${type}`);
+    const transcriptionEl = document.getElementById(`transcription-${type}`);
+    if (manualInput) manualInput.value = '';
+    if (transcriptionEl) {
+      transcriptionEl.textContent = 'Tap microphone to record or type below';
+      transcriptionEl.classList.remove('active');
+    }
+    isVoice = false;
+    
+    await refreshEntries(type);
+  } catch (error) {
+    console.error('Failed to save entry:', error);
+    showToast('Failed to save entry', 'error');
+  }
+}
+
+async function refreshEntries(type) {
+  const today = getLocalDate();
+  const entries = await getEntries({ type });
+  const todayEntries = entries.filter(e => e.date === today);
+  
+  // Update totals
+  const todayTotal = todayEntries.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const todayEl = document.getElementById(`total-${type}s-today`);
+  if (todayEl) todayEl.textContent = formatCurrency(todayTotal);
+  
+  // Update tags
+  const allTags = new Set();
+  entries.forEach(e => e.tags && e.tags.forEach(tag => allTags.add(tag)));
+  renderTags(type, Array.from(allTags));
+  
+  // Render entries
+  renderEntries(type, todayEntries.reverse());
+}
+
+function renderTags(type, tags) {
+  const container = document.getElementById(`tags-${type}`);
+  if (!container) return;
+  
+  if (tags.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.innerHTML = tags.map(tag => 
+    `<button class="tag" data-tag="${tag}">${tag}</button>`
+  ).join('');
+  
+  container.querySelectorAll('.tag').forEach(btn => {
+    btn.addEventListener('click', () => filterByTag(type, btn.dataset.tag, btn));
+  });
+}
+
+async function filterByTag(type, tag, btnEl) {
+  const isActive = btnEl.classList.contains('active');
+  
+  // Toggle active state
+  document.querySelectorAll(`#tags-${type} .tag`).forEach(b => b.classList.remove('active'));
+  
+  if (!isActive) {
+    btnEl.classList.add('active');
+    const entries = await getEntries({ type, tags: [tag] });
+    const filteredTotal = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const filteredEl = document.getElementById(`total-${type}s-filtered`);
+    if (filteredEl) filteredEl.textContent = formatCurrency(filteredTotal);
+    renderEntries(type, entries.reverse());
+  } else {
+    const filteredEl = document.getElementById(`total-${type}s-filtered`);
+    if (filteredEl) filteredEl.textContent = formatCurrency(0);
+    await refreshEntries(type);
+  }
+}
+
+function renderEntries(type, entries) {
+  const container = document.getElementById(`entries-${type}`);
+  if (!container) return;
+  
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>No entries yet</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = entries.map(entry => `
+    <div class="entry">
+      <div class="entry-header">
+        <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
+        ${entry.amount ? `<div class="entry-amount ${type}">${formatCurrency(entry.amount)}</div>` : ''}
+      </div>
+      <div class="entry-text">${entry.text}</div>
+      ${entry.tags && entry.tags.length > 0 ? `
+        <div class="tags">
+          ${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+        </div>
+      ` : ''}
+      <div class="entry-actions">
+        <button class="btn btn-danger btn-small" onclick="deleteEntryById('${entry.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteEntryById(id) {
+  if (!confirm('Delete this entry?')) return;
+  
+  try {
+    await deleteEntry(id);
+    showToast('Entry deleted', 'success');
+    
+    // Refresh current view
+    const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+    if (activeTab === 'assets') {
+      await refreshEntries('asset');
+    } else if (activeTab === 'liabilities') {
+      await refreshEntries('liability');
+    } else if (activeTab === 'diary') {
+      await refreshDiary();
+    }
+  } catch (error) {
+    console.error('Failed to delete entry:', error);
+    showToast('Failed to delete entry', 'error');
+  }
+}
+
+// Diary
+async function addDiaryEntry(text) {
+  if (!text.trim()) {
+    showToast('Please enter some text', 'error');
+    return;
+  }
+  
+  const tags = extractTags(text);
+  
+  const entry = {
+    id: uuid(),
+    type: 'diary',
+    date: getLocalDate(),
+    time: getLocalTime(),
+    timestamp: Date.now(),
+    text: text.trim(),
+    amount: null,
+    currency: null,
+    tags: tags,
+    source: isVoice ? 'voice' : 'manual'
+  };
+  
+  try {
+    await saveEntry(entry);
+    showToast('Diary entry saved!', 'success');
+    
+    const manualInput = document.getElementById('manual-diary');
+    const transcriptionEl = document.getElementById('transcription-diary');
+    if (manualInput) manualInput.value = '';
+    if (transcriptionEl) {
+      transcriptionEl.textContent = 'Tap microphone to record or type below';
+      transcriptionEl.classList.remove('active');
+    }
+    isVoice = false;
+    
+    await refreshDiary();
+  } catch (error) {
+    console.error('Failed to save diary entry:', error);
+    showToast('Failed to save diary entry', 'error');
+  }
+}
+
+async function refreshDiary() {
+  const searchQuery = document.getElementById('search-diary').value;
+  const entries = await getEntries({ 
+    type: 'diary',
+    search: searchQuery
+  });
+  
+  // Get all tags
+  const allTags = new Set();
+  entries.forEach(e => e.tags && e.tags.forEach(tag => allTags.add(tag)));
+  renderDiaryTags(Array.from(allTags));
+  
+  renderDiaryEntries(entries.reverse());
+}
+
+function renderDiaryTags(tags) {
+  const container = document.getElementById('tags-diary');
+  if (!container) return;
+  
+  if (tags.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.innerHTML = tags.map(tag => 
+    `<button class="tag" data-tag="${tag}">${tag}</button>`
+  ).join('');
+  
+  container.querySelectorAll('.tag').forEach(btn => {
+    btn.addEventListener('click', () => filterDiaryByTag(btn.dataset.tag, btn));
+  });
+}
+
+async function filterDiaryByTag(tag, btnEl) {
+  const isActive = btnEl.classList.contains('active');
+  
+  document.querySelectorAll('#tags-diary .tag').forEach(b => b.classList.remove('active'));
+  
+  if (!isActive) {
+    btnEl.classList.add('active');
+    const entries = await getEntries({ type: 'diary', tags: [tag] });
+    renderDiaryEntries(entries.reverse());
+  } else {
+    await refreshDiary();
+  }
+}
+
+function renderDiaryEntries(entries) {
+  const container = document.getElementById('entries-diary');
+  if (!container) return;
+  
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <p>No diary entries yet</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = entries.map(entry => `
+    <div class="entry">
+      <div class="entry-header">
+        <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
+      </div>
+      <div class="entry-text">${entry.text}</div>
+      ${entry.tags && entry.tags.length > 0 ? `
+        <div class="tags">
+          ${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+        </div>
+      ` : ''}
+      <div class="entry-actions">
+        <button class="btn btn-danger btn-small" onclick="deleteEntryById('${entry.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// To-Do
+async function addTodo() {
+  const titleInput = document.getElementById('todo-title');
+  const dueInput = document.getElementById('todo-due');
+  
+  const title = titleInput.value.trim();
+  if (!title) {
+    showToast('Please enter a task title', 'error');
+    return;
+  }
+  
+  const due = dueInput.value ? dueInput.value : null;
+  
+  const entry = {
+    id: uuid(),
+    type: 'todo',
+    date: getLocalDate(),
+    time: getLocalTime(),
+    timestamp: Date.now(),
+    text: title,
+    amount: null,
+    currency: null,
+    tags: ['todo'],
+    source: 'manual',
+    todoMeta: {
+      status: 'pending',
+      due: due
+    }
+  };
+  
+  try {
+    await saveEntry(entry);
+    showToast('Task added!', 'success');
+    titleInput.value = '';
+    dueInput.value = '';
+    await refreshTodos();
+  } catch (error) {
+    console.error('Failed to add task:', error);
+    showToast('Failed to add task', 'error');
+  }
+}
+
+async function toggleTodo(id, checked) {
+  try {
+    const entries = await getEntries({});
+    const todo = entries.find(e => e.id === id);
+    if (!todo) return;
+    
+    if (checked) {
+      // Mark as done and create diary entry
+      await updateEntry(id, {
+        todoMeta: { ...todo.todoMeta, status: 'done' }
+      });
+      
+      const diaryEntry = {
+        id: uuid(),
+        type: 'diary',
+        date: getLocalDate(),
+        time: getLocalTime(),
+        timestamp: Date.now(),
+        text: `Completed task: ${todo.text}`,
+        amount: null,
+        currency: null,
+        tags: ['todo'],
+        source: 'todo-auto'
+      };
+      await saveEntry(diaryEntry);
+      
+      showToast('Task completed!', 'success');
+    } else {
+      await updateEntry(id, {
+        todoMeta: { ...todo.todoMeta, status: 'pending' }
+      });
+    }
+    
+    await refreshTodos();
+    await refreshDiary();
+  } catch (error) {
+    console.error('Failed to toggle task:', error);
+    showToast('Failed to update task', 'error');
+  }
+}
+
+async function deleteTodo(id) {
+  if (!confirm('Delete this task?')) return;
+  
+  try {
+    await deleteEntry(id);
+    showToast('Task deleted', 'success');
+    await refreshTodos();
+  } catch (error) {
+    console.error('Failed to delete task:', error);
+    showToast('Failed to delete task', 'error');
+  }
+}
+
+async function checkMissedTasks() {
+  const now = Date.now();
+  const entries = await getEntries({ type: 'todo' });
+  
+  for (const todo of entries) {
+    if (todo.todoMeta.status === 'pending') {
+      const dueTime = todo.todoMeta.due ? new Date(todo.todoMeta.due).getTime() : null;
+      const isMissed = dueTime && dueTime < now;
+      
+      if (isMissed) {
+        await updateEntry(todo.id, {
+          todoMeta: { ...todo.todoMeta, status: 'missed' }
+        });
+        
+        const diaryEntry = {
+          id: uuid(),
+          type: 'diary',
+          date: getLocalDate(),
+          time: '23:59:00',
+          timestamp: Date.now(),
+          text: `Missed task: ${todo.text}`,
+          amount: null,
+          currency: null,
+          tags: ['todo-missed'],
+          source: 'todo-auto'
+        };
+        await saveEntry(diaryEntry);
+      }
+    }
+  }
+  
+  await refreshTodos();
+  await refreshDiary();
+}
+
+async function refreshTodos() {
+  const entries = await getEntries({ type: 'todo' });
+  
+  const pending = entries.filter(e => e.todoMeta.status === 'pending');
+  const completed = entries.filter(e => e.todoMeta.status === 'done');
+  const missed = entries.filter(e => e.todoMeta.status === 'missed');
+  
+  renderTodos('pending', pending);
+  renderTodos('completed', completed);
+  renderTodos('missed', missed);
+}
+
+function renderTodos(status, todos) {
+  const container = document.getElementById(`todos-${status}`);
+  if (!container) return;
+  
+  if (todos.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem;">None</p>';
+    return;
+  }
+  
+  container.innerHTML = todos.map(todo => {
+    const dueDate = todo.todoMeta.due ? new Date(todo.todoMeta.due) : null;
+    const isOverdue = dueDate && dueDate < new Date() && status === 'pending';
+    
+    return `
+      <div class="todo-item ${status === 'completed' || status === 'missed' ? 'completed' : ''}">
+        <input type="checkbox" 
+          ${status === 'completed' ? 'checked' : ''} 
+          onchange="toggleTodo('${todo.id}', this.checked)"
+          ${status === 'missed' ? 'disabled' : ''}
+        >
+        <div class="todo-content">
+          <div class="todo-title">${todo.text}</div>
+          ${dueDate ? `
+            <div class="todo-due ${isOverdue ? 'overdue' : ''}">
+              Due: ${dueDate.toLocaleString('en-IN', { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </div>
+          ` : ''}
+        </div>
+        <button class="btn btn-danger btn-small" onclick="deleteTodo('${todo.id}')">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// Calendar
+let currentCalendarMonth = new Date();
+
+async function renderCalendar() {
+  const year = currentCalendarMonth.getFullYear();
+  const month = currentCalendarMonth.getMonth();
+  
+  document.getElementById('calendar-month').textContent = 
+    currentCalendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
+  
+  const allEntries = await getEntries({});
+  const entriesByDate = {};
+  allEntries.forEach(e => {
+    if (!entriesByDate[e.date]) entriesByDate[e.date] = {assets: 0, liabilities: 0, diary: 0, todo: 0};
+    if (e.type === 'asset') entriesByDate[e.date].assets++;
+    else if (e.type === 'liability') entriesByDate[e.date].liabilities++;
+    else if (e.type === 'diary') {
+      entriesByDate[e.date].diary++;
+      if (e.tags && (e.tags.includes('todo') || e.tags.includes('todo-missed'))) {
+        entriesByDate[e.date].todo++;
+      }
+    } else if (e.type === 'todo') {
+      entriesByDate[e.date].todo++;
+    }
+  });
+  
+  const grid = document.getElementById('calendar-grid');
+  grid.innerHTML = '';
+  const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  dayHeaders.forEach(day => {
+    const header = document.createElement('div');
+    header.className = 'calendar-day-header';
+    header.textContent = day;
+    grid.appendChild(header);
+  });
+  
+  let currentDay = 1 - firstDay;
+  for (let i = 0; i < 42; i++) {
+    const cell = document.createElement('div');
+    cell.classList.add('calendar-day');
+    
+    let dayNum, dateStr, isOtherMonth = false;
+    if (currentDay < 1) {
+      dayNum = prevMonthDays + currentDay;
+      isOtherMonth = true;
+      cell.onclick = null;
+    } else if (currentDay > daysInMonth) {
+      dayNum = currentDay - daysInMonth;
+      isOtherMonth = true;
+      cell.onclick = null;
+    } else {
+      dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
+      dayNum = currentDay;
+      cell.onclick = () => showDayModal(dateStr);
+    }
+    
+    if (isOtherMonth) {
+      cell.innerHTML = `<div>${dayNum}</div>`;
+      cell.classList.add('other-month');
+    } else {
+      const counts = entriesByDate[dateStr] || {assets: 0, liabilities: 0, diary: 0, todo: 0};
+      let indicators = '';
+      if (counts.assets > 0) indicators += '<div class="calendar-indicator asset"></div>';
+      if (counts.liabilities > 0) indicators += '<div class="calendar-indicator liability"></div>';
+      if (counts.diary > 0) indicators += '<div class="calendar-indicator diary"></div>';
+      if (counts.todo > 0) indicators += '<div class="calendar-indicator todo"></div>';
+      
+      cell.innerHTML = `
+        <div>${dayNum}</div>
+        ${indicators ? `<div class="calendar-indicators">${indicators}</div>` : ''}
+      `;
+      if (dateStr === getLocalDate()) cell.classList.add('today');
+    }
+    
+    grid.appendChild(cell);
+    currentDay++;
+  }
+}
+
+async function showDayModal(dateStr) {
+  document.getElementById('day-modal-title').textContent = new Date(dateStr).toLocaleDateString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  const content = document.getElementById('day-modal-content');
+  const entries = await getEntries({ date: dateStr });
+  
+  const assets = entries.filter(e => e.type === 'asset');
+  const liabilities = entries.filter(e => e.type === 'liability');
+  const diary = entries.filter(e => e.type === 'diary');
+  const todos = entries.filter(e => e.type === 'todo');
+  
+  const assetTotal = assets.reduce((s, e) => s + (e.amount || 0), 0);
+  const liabTotal = liabilities.reduce((s, e) => s + (e.amount || 0), 0);
+  const balance = assetTotal - liabTotal;
+  
+  let html = `
+    <div class="totals">
+      <div class="total-card asset">
+        <div class="label">Assets</div>
+        <div class="amount">${formatCurrency(assetTotal)}</div>
+      </div>
+      <div class="total-card liability">
+        <div class="label">Liabilities</div>
+        <div class="amount">${formatCurrency(liabTotal)}</div>
+      </div>
+      <div class="total-card">
+        <div class="label">Balance</div>
+        <div class="amount" style="color: ${balance >= 0 ? 'var(--success)' : 'var(--danger)'}">${formatCurrency(balance)}</div>
+      </div>
+    </div>
+  `;
+  
+  if (assets.length > 0) {
+    html += `<h3>Assets</h3><div class="entries">${assets.map(entry => `
+      <div class="entry">
+        <div class="entry-header">
+          <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
+          <div class="entry-amount asset">${formatCurrency(entry.amount)}</div>
+        </div>
+        <div class="entry-text">${entry.text}</div>
+        ${entry.tags && entry.tags.length > 0 ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+      </div>
+    `).join('')}</div>`;
+  }
+  if (liabilities.length > 0) {
+    html += `<h3>Liabilities</h3><div class="entries">${liabilities.map(entry => `
+      <div class="entry">
+        <div class="entry-header">
+          <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
+          <div class="entry-amount liability">${formatCurrency(entry.amount)}</div>
+        </div>
+        <div class="entry-text">${entry.text}</div>
+        ${entry.tags && entry.tags.length > 0 ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+      </div>
+    `).join('')}</div>`;
+  }
+  if (diary.length > 0) {
+    html += `<h3>Diary</h3><div class="entries">${diary.map(entry => `
+      <div class="entry">
+        <div class="entry-header">
+          <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
+        </div>
+        <div class="entry-text">${entry.text}</div>
+        ${entry.tags && entry.tags.length > 0 ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+      </div>
+    `).join('')}</div>`;
+  }
+  if (todos.length > 0) {
+    const pending = todos.filter(t => t.todoMeta.status === 'pending');
+    const completed = todos.filter(t => t.todoMeta.status === 'done');
+    const missed = todos.filter(t => t.todoMeta.status === 'missed');
+    html += `
+      <h3>To-Do Summary</h3>
+      <p><strong>Pending:</strong> ${pending.length}</p>
+      <p><strong>Completed:</strong> ${completed.length}</p>
+      <p><strong>Missed:</strong> ${missed.length}</p>
+    `;
+  }
+  
+  html += `
+    <div class="export-buttons" style="margin-top: 1rem;">
+      <button class="btn btn-secondary btn-small" onclick="exportDay('${dateStr}', 'json')">Export JSON</button>
+      <button class="btn btn-secondary btn-small" onclick="exportDay('${dateStr}', 'csv')">Export CSV</button>
+    </div>
+  `;
+  
+  content.innerHTML = html;
+  document.getElementById('day-modal').classList.add('active');
+}
+
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportDay(date, format) {
+  const entries = await getEntries({ date });
+  const filename = `alertjar-${date}.${format}`;
+  
+  if (format === 'json') {
+    const data = entries.map(e => ({ ...e, todoMeta: e.todoMeta || null }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    download(blob, filename);
+  } else {
+    let csv = 'Type,Date,Time,Text,Amount,Currency,Tags,Status,Due\n';
+    entries.forEach(e => {
+      const status = e.todoMeta ? e.todoMeta.status : '';
+      const due = e.todoMeta ? e.todoMeta.due : '';
+      csv += `"${e.type}","${e.date}","${e.time}","${e.text.replace(/"/g, '""')}","${e.amount || ''}","${e.currency || ''}","${(e.tags || []).join(';')}","${status}","${due}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    download(blob, filename);
+  }
+  showToast('Exported successfully', 'success');
+}
+
+async function exportAll(format) {
+  const entries = await getEntries({});
+  const filename = `alertjar-all.${format}`;
+  
+  if (format === 'json') {
+    const data = entries.map(e => ({ ...e, todoMeta: e.todoMeta || null }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    download(blob, filename);
+  } else {
+    let csv = 'Type,Date,Time,Text,Amount,Currency,Tags,Status,Due\n';
+    entries.forEach(e => {
+      const status = e.todoMeta ? e.todoMeta.status : '';
+      const due = e.todoMeta ? e.todoMeta.due : '';
+      csv += `"${e.type}","${e.date}","${e.time}","${e.text.replace(/"/g, '""')}","${e.amount || ''}","${e.currency || ''}","${(e.tags || []).join(';')}","${status}","${due}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    download(blob, filename);
+  }
+  showToast('Exported successfully', 'success');
+}
+
+// Modals
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-close') || e.target.classList.contains('modal')) {
+    e.target.closest('.modal').classList.remove('active');
+  }
+});
+
+document.querySelector('.help-btn').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.toggle('active');
+});
+
+document.getElementById('toggle-todo').addEventListener('click', () => {
+  const todoCard = document.querySelector('#diary-tab .card:last-of-type');
+  todoCard.style.display = todoCard.style.display === 'none' ? 'block' : 'none';
+});
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', async () => {
+  await initDB();
+  initSpeechRecognition();
+  
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      const tabId = btn.dataset.tab + '-tab';
+      document.getElementById(tabId).classList.add('active');
+      
+      const tabType = btn.dataset.tab;
+      if (tabType === 'assets') await refreshEntries('asset');
+      else if (tabType === 'liabilities') await refreshEntries('liability');
+      else if (tabType === 'diary') await refreshDiary();
+      else if (tabType === 'calendar') await renderCalendar();
+    });
+  });
+  
+  // Record buttons
+  ['asset', 'liability', 'diary'].forEach(type => {
+    const btn = document.getElementById(`record-${type}`);
+    if (btn) btn.addEventListener('click', () => startRecording(type));
+  });
+  
+  // Add buttons
+  document.getElementById('add-asset').addEventListener('click', () => addEntry('asset', document.getElementById('manual-asset').value));
+  document.getElementById('add-liability').addEventListener('click', () => addEntry('liability', document.getElementById('manual-liability').value));
+  document.getElementById('add-diary').addEventListener('click', () => addDiaryEntry(document.getElementById('manual-diary').value));
+  document.getElementById('add-todo').addEventListener('click', addTodo);
+  
+  // Search diary
+  const debounce = (fn, delay) => {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  };
+  document.getElementById('search-diary').addEventListener('input', debounce(refreshDiary, 300));
+  
+  // Calendar nav
+  document.getElementById('prev-month').addEventListener('click', () => {
+    currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById('next-month').addEventListener('click', () => {
+    currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() + 1);
+    renderCalendar();
+  });
+  document.getElementById('today-btn').addEventListener('click', () => {
+    currentCalendarMonth = new Date();
+    renderCalendar();
+  });
+  
+  // Export/Import
+  document.getElementById('export-json').addEventListener('click', () => exportAll('json'));
+  document.getElementById('export-csv').addEventListener('click', () => exportAll('csv'));
+  document.getElementById('import-json').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      for (const entry of data) {
+        await saveEntry(entry);
+      }
+      showToast('Imported successfully', 'success');
+      e.target.value = '';
+      // Refresh current tab
+      const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+      if (activeTab === 'assets') await refreshEntries('asset');
+      else if (activeTab === 'liabilities') await refreshEntries('liability');
+      else if (activeTab === 'diary') await refreshDiary();
+      else if (activeTab === 'calendar') await renderCalendar();
+    } catch (err) {
+      showToast('Import failed: ' + err.message, 'error');
+    }
+  });
+  
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'h') {
+      e.preventDefault();
+      document.getElementById('help-modal').classList.toggle('active');
+    }
+    const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+    const activeIdx = tabs.findIndex(b => b.classList.contains('active'));
+    if (e.key === 'ArrowLeft' && activeIdx > 0) {
+      e.preventDefault();
+      tabs[activeIdx - 1].click();
+    } else if (e.key === 'ArrowRight' && activeIdx < tabs.length - 1) {
+      e.preventDefault();
+      tabs[activeIdx + 1].click();
+    }
+  });
+  
+  // Initial load
+  await refreshEntries('asset');
+  await checkMissedTasks();
+  setMidnightCheck();
+});
+
+function setMidnightCheck() {
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  const msToMidnight = tomorrow.getTime() - now.getTime();
+  
+  setTimeout(async () => {
+    await checkMissedTasks();
+    setMidnightCheck();
+  }, msToMidnight);
+}
+</script>
+</body>
+</html>

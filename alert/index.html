@@ -3,18 +3,13 @@
 <head>
 <!--
   Alert Jar - Lightweight PWA-style Web App
-  Version: v2.0
-  Created: 2025-10-09
+  Version: v2.1
+  Created: 2025-10-10
   
-  New Features (v2.0):
-  - Ledger Tab: Combines Assets and Liabilities.
-  - Graphs Tab: Visualizes assets vs liabilities with daily, monthly, yearly views. Graphs are downloadable.
-  - Integrated To-Do: Diary tab now contains Journal and To-Do sub-tabs. Completed tasks are auto-logged.
-  - Improved CSV Export: Handles special characters correctly.
-  
-  Keyboard shortcuts:
-  - Arrow Left/Right: Switch main tabs
-  - Ctrl+H: Show help
+  Changes (v2.1):
+  - Fixed bug preventing liability entries from saving.
+  - Microphone now works as a toggle (press to start, press again to stop).
+  - Added a light/dark mode theme switcher.
 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
@@ -38,6 +33,18 @@
   --shadow: rgba(0, 0, 0, 0.1);
 }
 
+html[data-theme="dark"] {
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --bg: #111827;
+  --bg-secondary: #1f2937;
+  --text: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --border: #374151;
+  --shadow: rgba(0, 0, 0, 0.2);
+}
+
+
 * {
   margin: 0;
   padding: 0;
@@ -50,6 +57,7 @@ body {
   color: var(--text);
   line-height: 1.6;
   overflow-x: hidden;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -81,12 +89,18 @@ header {
   padding: 1rem;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 h1 {
   font-size: 1.5rem;
   font-weight: 600;
 }
 
-.help-btn {
+.icon-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -95,7 +109,7 @@ h1 {
   color: var(--text-secondary);
 }
 
-.help-btn:hover {
+.icon-btn:hover {
   background: var(--bg-secondary);
 }
 
@@ -262,6 +276,8 @@ textarea {
   border-radius: 0.375rem;
   font-size: 0.875rem;
   font-family: inherit;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 textarea {
@@ -513,6 +529,7 @@ textarea {
 
 .calendar-day.other-month {
   opacity: 0.3;
+  cursor: default;
 }
 
 .calendar-indicators {
@@ -665,11 +682,18 @@ textarea {
 
 .warning-banner {
   background: #fef3c7;
+  color: #92400e;
   border: 1px solid #fbbf24;
   padding: 0.75rem;
   border-radius: 0.375rem;
   margin-bottom: 1rem;
   font-size: 0.875rem;
+}
+
+html[data-theme="dark"] .warning-banner {
+    background: #373021;
+    color: #fde68a;
+    border-color: #f59e0b;
 }
 
 .export-section {
@@ -687,6 +711,12 @@ textarea {
 .hidden {
   display: none !important;
 }
+
+#theme-toggle .moon { display: none; }
+#theme-toggle .sun { display: block; }
+html[data-theme="dark"] #theme-toggle .moon { display: block; }
+html[data-theme="dark"] #theme-toggle .sun { display: none; }
+
 </style>
 </head>
 <body>
@@ -694,13 +724,19 @@ textarea {
 <header>
   <div class="header-content">
     <h1>Alert Jar</h1>
-    <button class="help-btn" aria-label="Help" title="Help (Ctrl+H)">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-    </button>
+    <div class="header-actions">
+        <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+            <svg class="sun" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg class="moon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+        <button id="help-btn" class="icon-btn" aria-label="Help" title="Help (Ctrl+H)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </button>
+    </div>
   </div>
   <nav role="navigation">
     <button class="tab-btn active" data-tab="ledger" aria-label="Ledger">
@@ -942,7 +978,7 @@ textarea {
       
       <h3>Privacy Notice</h3>
       <p style="margin: 1rem 0;">
-        <strong>Speech Recognition:</strong> This app uses your browser's built-in speech recognition, which may send audio to external services (like Google or Apple) for processing. The app itself does not collect or send any data to its own servers. Using `whisper.cpp` client-side is not feasible for web apps, but a server-based implementation could be a future alternative.
+        <strong>Speech Recognition:</strong> This app uses your browser's built-in speech recognition, which may send audio to external services (like Google or Apple) for processing. The app itself does not collect or send any data to its own servers.
       </p>
       <p style="margin: 1rem 0;">
         <strong>Data Storage:</strong> All your data is stored locally on your device using IndexedDB. Nothing is sent to any server. Use the export feature to backup your data.
@@ -970,6 +1006,7 @@ textarea {
 </div>
 
 <script>
+// Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(err => {
@@ -1016,7 +1053,7 @@ async function saveEntry(entry) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(['entries'], 'readwrite');
     const store = transaction.objectStore('entries');
-    const request = store.add(entry);
+    const request = store.put(entry);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -1031,26 +1068,13 @@ async function getEntries(filters = {}) {
     request.onsuccess = () => {
       let entries = request.result;
       
-      if (filters.type) {
-        entries = entries.filter(e => e.type === filters.type);
-      }
-       if (filters.types) { // For getting multiple types like ['asset', 'liability']
-        entries = entries.filter(e => filters.types.includes(e.type));
-      }
-      if (filters.date) {
-        entries = entries.filter(e => e.date === filters.date);
-      }
-      if (filters.tags && filters.tags.length > 0) {
-        entries = entries.filter(e => 
-          e.tags && e.tags.some(tag => filters.tags.includes(tag))
-        );
-      }
+      if (filters.type) entries = entries.filter(e => e.type === filters.type);
+      if (filters.types) entries = entries.filter(e => filters.types.includes(e.type));
+      if (filters.date) entries = entries.filter(e => e.date === filters.date);
+      if (filters.tags && filters.tags.length > 0) entries = entries.filter(e => e.tags && e.tags.some(tag => filters.tags.includes(tag)));
       if (filters.search) {
         const search = filters.search.toLowerCase();
-        entries = entries.filter(e => 
-          e.text.toLowerCase().includes(search) ||
-          (e.tags && e.tags.some(tag => tag.includes(search)))
-        );
+        entries = entries.filter(e => e.text.toLowerCase().includes(search) || (e.tags && e.tags.some(tag => tag.includes(search))));
       }
       
       resolve(entries.sort((a, b) => b.timestamp - a.timestamp));
@@ -1087,206 +1111,136 @@ async function updateEntry(id, updates) {
 }
 
 // Utility functions
-function uuid() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-function formatCurrency(amount) {
-  if (amount == null) return 'No amount';
-  return CONFIG.DEFAULT_CURRENCY + amount.toLocaleString('en-IN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2
-  });
-}
+const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
+const formatCurrency = (amount) => amount == null ? 'No amount' : CONFIG.DEFAULT_CURRENCY + amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const getLocalDate = () => new Date().toISOString().split('T')[0];
+const formatDateTime = (timestamp) => new Date(timestamp).toLocaleString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 function parseAmount(text) {
   const patterns = [
     /([+-]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/g,
-    /(\d+(?:\.\d+)?\s*[kK])/g,
-    /₹?([+-]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/g,
-    /(?:Rs?|INR)\s+([+-]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi,
-    /([+-]?\d+(?:\.\d+)?)\s+(?:rupees?|rupee)/gi
+    /(\d+(?:\.\d+)?\s*[kK])/g
   ];
-  
   let amounts = [];
-  
   for (const pattern of patterns) {
-    const matches = text.matchAll(pattern);
-    for (const match of matches) {
-      let valueStr = match[1] || match[0];
-      let value = valueStr.replace(/[,\s]/g, '');
-      let num = parseFloat(value);
-      if (isNaN(num)) continue;
-      if (value.match(/[kK]$/)) {
-        num *= 1000;
-      }
+    for (const match of text.matchAll(pattern)) {
+      let valueStr = (match[1] || match[0]).replace(/[,\s₹]|Rs|INR|rupees?|rupee/gi, '');
+      let num = parseFloat(valueStr);
+      if (valueStr.match(/[kK]$/i)) num *= 1000;
       if (!isNaN(num)) amounts.push(num);
     }
   }
-  
   return amounts.length > 0 ? amounts[amounts.length - 1] : null;
 }
 
 function extractTags(text) {
   const lower = text.toLowerCase();
-  const words = lower.split(/\s+/);
+  const words = new Set(lower.split(/\s+/));
   const tags = new Set();
-  
-  for (const tag of CONFIG.TAG_MAP) {
-    if (lower.includes(tag)) {
-      tags.add(tag);
-    }
-  }
-  
-  const fromMatch = lower.match(/(?:from|for)\s+([a-z\s]+?)(?:\s+\d|$)/i);
-  if (fromMatch) {
-    const phrase = fromMatch[1].trim();
-    if (phrase.length > 2) tags.add(phrase);
-  }
-  
-  for (const word of words) {
-    if (word.length > 3 && !CONFIG.STOPWORDS.includes(word) && !/\d/.test(word)) {
-      tags.add(word);
-    }
-  }
-  
+  CONFIG.TAG_MAP.forEach(tag => { if (lower.includes(tag)) tags.add(tag); });
+  const fromMatch = lower.match(/(?:from|for)\s+([\w\s]+?)(?:\s+\d|$)/i);
+  if (fromMatch && fromMatch[1].trim().length > 2) tags.add(fromMatch[1].trim());
+  words.forEach(word => { if (word.length > 3 && !CONFIG.STOPWORDS.includes(word) && !/\d/.test(word)) tags.add(word); });
   return Array.from(tags).slice(0, 5);
-}
-
-function getLocalDate() {
-  const now = new Date();
-  return now.toISOString().split('T')[0];
-}
-
-function getLocalTime() {
-  const now = new Date();
-  return now.toTimeString().split(' ')[0];
-}
-
-function formatDateTime(timestamp) {
-  return new Date(timestamp).toLocaleString('en-IN', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
 }
 
 function showToast(message, type = 'info', actions = []) {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `<span>${message}</span>`;
-  
-  for (const action of actions) {
+  actions.forEach(action => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
-    btn.onclick = () => {
-      action.handler();
-      toast.remove();
-    };
+    btn.onclick = () => { action.handler(); toast.remove(); };
     toast.appendChild(btn);
-  }
-  
+  });
   document.body.appendChild(toast);
-  
   setTimeout(() => toast.remove(), 5000);
 }
 
 // Speech Recognition
 let recognition;
+let recognitionIsActive = false;
 let currentRecognitionType = null;
 let isVoice = false;
 
 function initSpeechRecognition() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    console.warn('Speech recognition not supported');
-    return false;
-  }
-  
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return false;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SpeechRecognition();
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = 'en-IN';
   
   recognition.onresult = (event) => {
-    let transcript = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-    
+    let transcript = Array.from(event.results).map(r => r[0].transcript).join('');
     const transcriptionEl = document.getElementById(`transcription-${currentRecognitionType}`);
     if (transcriptionEl) {
       transcriptionEl.textContent = transcript;
       transcriptionEl.classList.add('active');
     }
-    
-    if (event.results[event.results.length - 1].isFinal) {
-      isVoice = true;
-      const manualInput = document.getElementById(`manual-${currentRecognitionType}`);
-      if (manualInput) {
-        manualInput.value = transcript;
-      }
-    }
+    isVoice = true;
+    document.getElementById(`manual-${currentRecognitionType}`).value = transcript;
   };
   
   recognition.onerror = (event) => {
     console.error('Speech recognition error:', event.error);
-    showToast('Speech recognition error: ' + event.error, 'error');
+    showToast(`Speech error: ${event.error}`, 'error');
     stopRecording();
   };
   
   recognition.onend = () => {
-    stopRecording();
+    if (recognitionIsActive) {
+      try { recognition.start(); } catch (e) { stopRecording(); }
+    } else {
+      stopRecordingCleanupUI();
+    }
   };
-  
   return true;
+}
+
+function handleRecordButtonClick(type) {
+    if (recognitionIsActive) {
+        stopRecording();
+    } else {
+        startRecording(type);
+    }
 }
 
 function startRecording(type) {
   if (!recognition) {
-    showToast('Speech recognition not available. Please type manually.', 'error');
+    showToast('Speech recognition not available.', 'error');
     return;
   }
   
   currentRecognitionType = type;
-  const btn = document.getElementById(`record-${type}`);
+  recognitionIsActive = true;
+  document.getElementById(`speech-warning-${type}`).classList.remove('hidden');
+  document.getElementById(`record-${type}`).classList.add('recording');
   const transcriptionEl = document.getElementById(`transcription-${type}`);
-  const warningEl = document.getElementById(`speech-warning-${type}`);
-  
-  if (warningEl) warningEl.classList.remove('hidden');
-  
-  btn.classList.add('recording');
   transcriptionEl.textContent = 'Listening...';
   transcriptionEl.classList.add('active');
   isVoice = false;
   
-  try {
-    recognition.start();
-  } catch (e) {
-    console.error('Failed to start recognition:', e);
+  try { recognition.start(); } catch (e) {
     stopRecording();
-    showToast('Failed to start recording. Ensure microphone permissions.', 'error');
+    showToast('Failed to start recording.', 'error');
   }
 }
 
 function stopRecording() {
-  if (recognition) {
-    try {
-      recognition.stop();
-    } catch (e) {}
-  }
-  
-  if (currentRecognitionType) {
-    const btn = document.getElementById(`record-${currentRecognitionType}`);
-    if (btn) btn.classList.remove('recording');
-    currentRecognitionType = null;
-  }
+    recognitionIsActive = false;
+    if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+    }
+    stopRecordingCleanupUI();
+}
+
+function stopRecordingCleanupUI() {
+    if (currentRecognitionType) {
+        document.getElementById(`record-${currentRecognitionType}`)?.classList.remove('recording');
+    }
+    // Don't reset currentRecognitionType here, onend needs it
 }
 
 // Entry Management
@@ -1295,25 +1249,14 @@ async function addEntry(type, text) {
     showToast('Please enter some text', 'error');
     return;
   }
-  
-  let amount = parseAmount(text);
-  
-  if (amount === null) {
-    if (!confirm('No amount detected. Save without amount?')) return;
-  }
-  
-  const tags = extractTags(text);
-  
   const entry = {
     id: uuid(),
     type: type,
     date: getLocalDate(),
-    time: getLocalTime(),
     timestamp: Date.now(),
     text: text.trim(),
-    amount: amount,
-    currency: amount ? CONFIG.DEFAULT_CURRENCY : null,
-    tags: tags,
+    amount: parseAmount(text),
+    tags: extractTags(text),
     source: isVoice ? 'voice' : 'manual'
   };
   
@@ -1321,11 +1264,7 @@ async function addEntry(type, text) {
     await saveEntry(entry);
     showToast('Entry saved!', 'success', [{
       label: 'Undo',
-      handler: async () => {
-        await deleteEntry(entry.id);
-        await refreshEntries(type);
-        showToast('Entry removed', 'info');
-      }
+      handler: async () => { await deleteEntry(entry.id); await refreshAll(); showToast('Entry removed', 'info'); }
     }]);
     
     document.getElementById(`manual-${type}`).value = '';
@@ -1334,12 +1273,9 @@ async function addEntry(type, text) {
     transcriptionEl.classList.remove('active');
     isVoice = false;
     
-    await refreshEntries(type);
-    await renderCalendar();
-    await renderDistributionGraph();
-
+    await refreshAll();
   } catch (error) {
-    console.error('Failed to save entry:', error);
+    console.error('Failed to save entry:', error, 'Entry object:', entry);
     showToast('Failed to save entry', 'error');
   }
 }
@@ -1361,22 +1297,15 @@ async function refreshEntries(type) {
 function renderTags(type, tags) {
   const container = document.getElementById(`tags-${type}`);
   if (!container) return;
-  
-  container.innerHTML = tags.map(tag => 
-    `<button class="tag" data-tag="${tag}">${tag}</button>`
-  ).join('');
-  
-  container.querySelectorAll('.tag').forEach(btn => {
-    btn.addEventListener('click', () => filterByTag(type, btn.dataset.tag, btn));
-  });
+  container.innerHTML = tags.map(tag => `<button class="tag" data-tag="${tag}">${tag}</button>`).join('');
+  container.querySelectorAll('.tag').forEach(btn => btn.addEventListener('click', () => filterByTag(type, btn.dataset.tag, btn)));
 }
 
 async function filterByTag(type, tag, btnEl) {
-  const isActive = btnEl.classList.contains('active');
-  document.querySelectorAll(`#tags-${type} .tag`).forEach(b => b.classList.remove('active'));
+  const isActive = btnEl.classList.toggle('active');
+  document.querySelectorAll(`#tags-${type} .tag`).forEach(b => { if(b !== btnEl) b.classList.remove('active'); });
   
-  if (!isActive) {
-    btnEl.classList.add('active');
+  if (isActive) {
     const entries = await getEntries({ type, tags: [tag] });
     const filteredTotal = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
     document.getElementById(`total-${type}s-filtered`).textContent = formatCurrency(filteredTotal);
@@ -1390,13 +1319,7 @@ async function filterByTag(type, tag, btnEl) {
 function renderEntries(type, entries) {
   const container = document.getElementById(`entries-${type}`);
   if (!container) return;
-  
-  if (entries.length === 0) {
-    container.innerHTML = `<div class="empty-state"><p>No entries yet</p></div>`;
-    return;
-  }
-  
-  container.innerHTML = entries.map(entry => `
+  container.innerHTML = entries.length === 0 ? `<div class="empty-state"><p>No entries yet</p></div>` : entries.map(entry => `
     <div class="entry">
       <div class="entry-header">
         <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
@@ -1404,24 +1327,17 @@ function renderEntries(type, entries) {
       </div>
       <div class="entry-text">${entry.text}</div>
       ${entry.tags && entry.tags.length > 0 ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
-      <div class="entry-actions">
-        <button class="btn btn-danger btn-small" onclick="deleteEntryById('${entry.id}')">Delete</button>
-      </div>
-    </div>
-  `).join('');
+      <div class="entry-actions"><button class="btn btn-danger btn-small" onclick="deleteEntryById('${entry.id}')">Delete</button></div>
+    </div>`).join('');
 }
 
 async function deleteEntryById(id) {
   if (!confirm('Delete this entry?')) return;
-  
   try {
     await deleteEntry(id);
     showToast('Entry deleted', 'success');
     await refreshAll();
-  } catch (error) {
-    console.error('Failed to delete entry:', error);
-    showToast('Failed to delete entry', 'error');
-  }
+  } catch (error) { showToast('Failed to delete entry', 'error'); }
 }
 
 // Diary
@@ -1430,179 +1346,100 @@ async function addDiaryEntry(text) {
     showToast('Please enter some text', 'error');
     return;
   }
-  
-  const entry = {
-    id: uuid(),
-    type: 'diary',
-    date: getLocalDate(),
-    time: getLocalTime(),
-    timestamp: Date.now(),
-    text: text.trim(),
-    amount: null,
-    currency: null,
-    tags: extractTags(text),
-    source: isVoice ? 'voice' : 'manual'
-  };
-  
+  const entry = { id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: text.trim(), tags: extractTags(text), source: isVoice ? 'voice' : 'manual' };
   try {
     await saveEntry(entry);
     showToast('Diary entry saved!', 'success');
-    
     document.getElementById('manual-diary').value = '';
     const transcriptionEl = document.getElementById('transcription-diary');
     transcriptionEl.textContent = 'Tap microphone to record or type below';
     transcriptionEl.classList.remove('active');
     isVoice = false;
-    
     await refreshDiary();
-  } catch (error) {
-    console.error('Failed to save diary entry:', error);
-    showToast('Failed to save diary entry', 'error');
-  }
+    await renderCalendar();
+  } catch (error) { showToast('Failed to save diary entry', 'error'); }
 }
 
 async function refreshDiary() {
-  const searchQuery = document.getElementById('search-diary').value;
-  const entries = await getEntries({ 
-    type: 'diary',
-    search: searchQuery
-  });
-  
+  const entries = await getEntries({ type: 'diary', search: document.getElementById('search-diary').value });
   const allTags = new Set(entries.flatMap(e => e.tags || []));
   renderDiaryTags(Array.from(allTags));
-  
   renderDiaryEntries(entries);
 }
 
 function renderDiaryTags(tags) {
   const container = document.getElementById('tags-diary');
   if (!container) return;
-  container.innerHTML = tags.map(tag => 
-    `<button class="tag" data-tag="${tag}">${tag}</button>`
-  ).join('');
-  
-  container.querySelectorAll('.tag').forEach(btn => {
-    btn.addEventListener('click', () => filterDiaryByTag(btn.dataset.tag, btn));
-  });
+  container.innerHTML = tags.map(tag => `<button class="tag" data-tag="${tag}">${tag}</button>`).join('');
+  container.querySelectorAll('.tag').forEach(btn => btn.addEventListener('click', () => filterDiaryByTag(btn.dataset.tag, btn)));
 }
 
 async function filterDiaryByTag(tag, btnEl) {
-  const isActive = btnEl.classList.contains('active');
-  document.querySelectorAll('#tags-diary .tag').forEach(b => b.classList.remove('active'));
-  
-  if (!isActive) {
-    btnEl.classList.add('active');
-    const entries = await getEntries({ type: 'diary', tags: [tag] });
-    renderDiaryEntries(entries);
-  } else {
-    await refreshDiary();
-  }
+  const isActive = btnEl.classList.toggle('active');
+  document.querySelectorAll('#tags-diary .tag').forEach(b => { if (b !== btnEl) b.classList.remove('active'); });
+  renderDiaryEntries(await getEntries({ type: 'diary', tags: isActive ? [tag] : [] }));
 }
 
 function renderDiaryEntries(entries) {
   const container = document.getElementById('entries-diary');
   if (!container) return;
-  
-  if (entries.length === 0) {
-    container.innerHTML = `<div class="empty-state"><p>No diary entries yet</p></div>`;
-    return;
-  }
-  
-  container.innerHTML = entries.map(entry => `
+  container.innerHTML = entries.length === 0 ? `<div class="empty-state"><p>No diary entries yet</p></div>` : entries.map(entry => `
     <div class="entry">
-      <div class="entry-header">
-        <div class="entry-time">${formatDateTime(entry.timestamp)}</div>
-      </div>
+      <div class="entry-header"><div class="entry-time">${formatDateTime(entry.timestamp)}</div></div>
       <div class="entry-text">${entry.text}</div>
        ${entry.tags && entry.tags.length > 0 ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
-      <div class="entry-actions">
-        <button class="btn btn-danger btn-small" onclick="deleteEntryById('${entry.id}')">Delete</button>
-      </div>
-    </div>
-  `).join('');
+      <div class="entry-actions"><button class="btn btn-danger btn-small" onclick="deleteEntryById('${entry.id}')">Delete</button></div>
+    </div>`).join('');
 }
 
 // To-Do
 async function addTodo() {
   const titleInput = document.getElementById('todo-title');
   const title = titleInput.value.trim();
-  if (!title) {
-    showToast('Please enter a task title', 'error');
-    return;
-  }
-  
-  const entry = {
-    id: uuid(),
-    type: 'todo',
-    date: getLocalDate(),
-    timestamp: Date.now(),
-    text: title,
-    todoMeta: {
-      status: 'pending',
-      due: document.getElementById('todo-due').value || null
-    }
-  };
-  
+  if (!title) { showToast('Please enter a task title', 'error'); return; }
+  const entry = { id: uuid(), type: 'todo', date: getLocalDate(), timestamp: Date.now(), text: title, todoMeta: { status: 'pending', due: document.getElementById('todo-due').value || null } };
   try {
     await saveEntry(entry);
     showToast('Task added!', 'success');
     titleInput.value = '';
     document.getElementById('todo-due').value = '';
     await refreshTodos();
-  } catch (error) {
-    showToast('Failed to add task', 'error');
-  }
+    await renderCalendar();
+  } catch (error) { showToast('Failed to add task', 'error'); }
 }
 
 async function toggleTodo(id, checked) {
   try {
     const todo = await getEntries({}).then(all => all.find(e => e.id === id));
     if (!todo) return;
-    
     if (checked) {
       await updateEntry(id, { todoMeta: { ...todo.todoMeta, status: 'done' } });
-      await saveEntry({
-        id: uuid(),
-        type: 'diary',
-        date: getLocalDate(),
-        timestamp: Date.now(),
-        text: `Completed task: ${todo.text}`,
-        tags: ['todo-done', ...extractTags(todo.text)],
-        source: 'todo-auto'
-      });
+      await saveEntry({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Completed task: ${todo.text}`, tags: ['todo-done', ...extractTags(todo.text)], source: 'todo-auto' });
       showToast('Task completed!', 'success');
     } else {
       await updateEntry(id, { todoMeta: { ...todo.todoMeta, status: 'pending' } });
     }
     await refreshTodos();
     await refreshDiary();
-  } catch (error) {
-    showToast('Failed to update task', 'error');
-  }
+    await renderCalendar();
+  } catch (error) { showToast('Failed to update task', 'error'); }
 }
 
 async function checkMissedTasks() {
   const now = Date.now();
   const todos = await getEntries({ type: 'todo' });
-  
+  let updated = false;
   for (const todo of todos) {
     if (todo.todoMeta.status === 'pending') {
       const dueTime = todo.todoMeta.due ? new Date(todo.todoMeta.due).getTime() : null;
       if (dueTime && dueTime < now) {
         await updateEntry(todo.id, { todoMeta: { ...todo.todoMeta, status: 'missed' } });
-        await saveEntry({
-          id: uuid(),
-          type: 'diary',
-          date: getLocalDate(),
-          timestamp: Date.now(),
-          text: `Missed task: ${todo.text}`,
-          tags: ['todo-missed'],
-          source: 'todo-auto'
-        });
+        await saveEntry({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Missed task: ${todo.text}`, tags: ['todo-missed'], source: 'todo-auto' });
+        updated = true;
       }
     }
   }
-  await refreshTodos();
+  if (updated) await refreshAll();
 }
 
 async function refreshTodos() {
@@ -1615,16 +1452,10 @@ async function refreshTodos() {
 function renderTodos(status, todos) {
   const container = document.getElementById(`todos-${status}`);
   if (!container) return;
-  
-  if (todos.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem;">None</p>';
-    return;
-  }
-  
+  if (todos.length === 0) { container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem;">None</p>'; return; }
   container.innerHTML = todos.map(todo => {
     const dueDate = todo.todoMeta.due ? new Date(todo.todoMeta.due) : null;
     const isOverdue = dueDate && dueDate < new Date() && status === 'pending';
-    
     return `
       <div class="todo-item ${status !== 'pending' ? 'completed' : ''}">
         <input type="checkbox" ${status === 'completed' ? 'checked' : ''} onchange="toggleTodo('${todo.id}', this.checked)" ${status === 'missed' ? 'disabled' : ''}>
@@ -1633,8 +1464,7 @@ function renderTodos(status, todos) {
           ${dueDate ? `<div class="todo-due ${isOverdue ? 'overdue' : ''}">Due: ${dueDate.toLocaleString('en-IN')}</div>` : ''}
         </div>
         <button class="btn btn-danger btn-small" onclick="deleteEntryById('${todo.id}')">×</button>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
@@ -1644,77 +1474,60 @@ let currentCalendarMonth = new Date();
 async function renderCalendar() {
   const year = currentCalendarMonth.getFullYear();
   const month = currentCalendarMonth.getMonth();
+  document.getElementById('calendar-month').textContent = currentCalendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   
-  document.getElementById('calendar-month').textContent = 
-    currentCalendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-  
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
-  const entries = await getEntries({});
-  const entriesByDate = {};
-  entries.forEach(e => {
-    if (!entriesByDate[e.date]) entriesByDate[e.date] = {assets:0, liabilities:0, diary:0, todo:0};
-    if (e.type === 'asset') entriesByDate[e.date].assets++;
-    else if (e.type === 'liability') entriesByDate[e.date].liabilities++;
-    else if (e.type === 'diary') entriesByDate[e.date].diary++;
-    else if (e.type === 'todo') entriesByDate[e.date].todo++;
-  });
+  const entriesByDate = (await getEntries({})).reduce((acc, e) => {
+    acc[e.date] = acc[e.date] || { a: 0, l: 0, d: 0, t: 0 };
+    if (e.type === 'asset') acc[e.date].a++;
+    else if (e.type === 'liability') acc[e.date].l++;
+    else if (e.type === 'diary') acc[e.date].d++;
+    else if (e.type === 'todo') acc[e.date].t++;
+    return acc;
+  }, {});
   
   const grid = document.getElementById('calendar-grid');
-  grid.innerHTML = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    .map(day => `<div class="calendar-day-header">${day}</div>`).join('');
-
-  for (let i = 0; i < firstDay; i++) {
-    grid.innerHTML += `<div class="calendar-day other-month"></div>`;
-  }
-
+  grid.innerHTML = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => `<div class="calendar-day-header">${day}</div>`).join('');
+  
+  const firstDay = new Date(year, month, 1).getDay();
+  for (let i = 0; i < firstDay; i++) grid.insertAdjacentHTML('beforeend', `<div class="calendar-day other-month"></div>`);
+  
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    const today = new Date().toISOString().split('T')[0];
-    const isToday = dateStr === today;
+    const indicatorsData = entriesByDate[dateStr];
+    const indicators = indicatorsData ? [
+        (indicatorsData.a > 0 ? '<div class="calendar-indicator asset"></div>' : ''),
+        (indicatorsData.l > 0 ? '<div class="calendar-indicator liability"></div>' : ''),
+        (indicatorsData.d > 0 ? '<div class="calendar-indicator diary"></div>' : ''),
+        (indicatorsData.t > 0 ? '<div class="calendar-indicator todo"></div>' : '')
+    ].join('') : '';
     
-    const indicators = [];
-    if (entriesByDate[dateStr]) {
-      if (entriesByDate[dateStr].assets > 0) indicators.push('<div class="calendar-indicator asset"></div>');
-      if (entriesByDate[dateStr].liabilities > 0) indicators.push('<div class="calendar-indicator liability"></div>');
-      if (entriesByDate[dateStr].diary > 0) indicators.push('<div class="calendar-indicator diary"></div>');
-      if (entriesByDate[dateStr].todo > 0) indicators.push('<div class="calendar-indicator todo"></div>');
-    }
-    
-    grid.innerHTML += `
-      <div class="calendar-day ${isToday ? 'today' : ''}" onclick="showDayEntries('${dateStr}')">
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="calendar-day ${dateStr === getLocalDate() ? 'today' : ''}" onclick="showDayEntries('${dateStr}')">
         ${dayNum}
-        ${indicators.length > 0 ? `<div class="calendar-indicators">${indicators.join('')}</div>` : ''}
-      </div>`;
+        ${indicators ? `<div class="calendar-indicators">${indicators}</div>` : ''}
+      </div>`);
   }
 }
 
-function showDayEntries(date) {
+async function showDayEntries(date) {
     const modal = document.getElementById('day-modal');
     document.getElementById('day-modal-title').textContent = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    
-    getEntries({ date }).then(entries => {
-        const contentEl = document.getElementById('day-modal-content');
-        if (entries.length === 0) {
-            contentEl.innerHTML = '<p>No entries for this day.</p>';
-        } else {
-            contentEl.innerHTML = entries.map(entry => `
-            <div class="entry">
-              <div class="entry-header">
-                <div class="entry-time">${formatDateTime(entry.timestamp)} (${entry.type})</div>
-                ${entry.amount != null ? `<div class="entry-amount ${entry.type}">${formatCurrency(entry.amount)}</div>` : ''}
-              </div>
-              <div class="entry-text">${entry.text}</div>
-            </div>`).join('');
-        }
-        modal.classList.add('active');
-    });
+    const entries = await getEntries({ date });
+    const contentEl = document.getElementById('day-modal-content');
+    contentEl.innerHTML = entries.length === 0 ? '<p>No entries for this day.</p>' : entries.map(entry => `
+        <div class="entry">
+          <div class="entry-header">
+            <div class="entry-time">${formatDateTime(entry.timestamp)} (${entry.type})</div>
+            ${entry.amount != null ? `<div class="entry-amount ${entry.type}">${formatCurrency(entry.amount)}</div>` : ''}
+          </div>
+          <div class="entry-text">${entry.text}</div>
+        </div>`).join('');
+    modal.classList.add('active');
 }
 
 // Graphs
 let chartInstance;
-
 async function renderDistributionGraph() {
     const period = document.querySelector('.graph-period-selector .btn.active')?.dataset.period || 'monthly';
     const entries = await getEntries({ types: ['asset', 'liability'] });
@@ -1736,221 +1549,158 @@ async function renderDistributionGraph() {
         } else { // yearly
             key = date.getFullYear().toString();
         }
-        
         labels.add(key);
-        const type = entry.type === 'asset' ? 'assets' : 'liabilities';
-        data[type][key] = (data[type][key] || 0) + entry.amount;
+        data[entry.type][key] = (data[entry.type][key] || 0) + entry.amount;
     });
 
     const sortedLabels = Array.from(labels).sort();
     const chartData = {
         labels: sortedLabels,
         datasets: [
-            {
-                label: 'Assets',
-                data: sortedLabels.map(label => data.assets[label] || 0),
-                backgroundColor: 'rgba(16, 185, 129, 0.7)',
-                borderColor: 'rgba(16, 185, 129, 1)',
-                borderWidth: 1
-            },
-            {
-                label: 'Liabilities',
-                data: sortedLabels.map(label => data.liabilities[label] || 0),
-                backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                borderColor: 'rgba(239, 68, 68, 1)',
-                borderWidth: 1
-            }
+            { label: 'Assets', data: sortedLabels.map(l => data.assets[l] || 0), backgroundColor: 'rgba(16, 185, 129, 0.7)' },
+            { label: 'Liabilities', data: sortedLabels.map(l => data.liabilities[l] || 0), backgroundColor: 'rgba(239, 68, 68, 0.7)' }
         ]
     };
-
+    const chartOptions = {
+        scales: { y: { beginAtZero: true, ticks: { color: 'var(--text-secondary)' } }, x: { ticks: { color: 'var(--text-secondary)' } } },
+        plugins: { legend: { labels: { color: 'var(--text-secondary)' } } }
+    };
     const ctx = document.getElementById('distribution-chart').getContext('2d');
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
-    chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: chartData,
-        options: { scales: { y: { beginAtZero: true } } }
-    });
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx, { type: 'bar', data: chartData, options: chartOptions });
 }
-
 
 // Export/Import
-function formatCsvField(data) {
+const formatCsvField = (data) => {
     if (data == null) return '';
     const string = String(data);
-    if (string.includes('"') || string.includes(',') || string.includes('\n')) {
-        return `"${string.replace(/"/g, '""')}"`;
-    }
-    return string;
+    return (string.includes('"') || string.includes(',') || string.includes('\n')) ? `"${string.replace(/"/g, '""')}"` : string;
 }
 
-function exportData(format) {
-  getEntries({}).then(entries => {
-    let data;
-    const date = getLocalDate();
-    if (format === 'json') {
-      data = JSON.stringify(entries, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      downloadBlob(blob, `alertjar-export-${date}.json`);
-    } else if (format === 'csv') {
-      const headers = ['id', 'type', 'date', 'timestamp', 'text', 'amount', 'currency', 'tags', 'source', 'todo_meta'];
-      const rows = entries.map(entry => [
-        entry.id, entry.type, entry.date, entry.timestamp,
-        entry.text, entry.amount, entry.currency, 
-        entry.tags ? entry.tags.join(';') : '',
-        entry.source,
-        entry.todoMeta ? JSON.stringify(entry.todoMeta).replace(/"/g, '""') : ''
-      ].map(formatCsvField));
-      
-      data = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-      const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' });
-      downloadBlob(blob, `alertjar-export-${date}.csv`);
-    }
-    showToast(`Exported as ${format.toUpperCase()}`, 'success');
-  });
+async function exportData(format) {
+  const entries = await getEntries({});
+  const date = getLocalDate();
+  if (format === 'json') {
+    downloadBlob(new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' }), `alertjar-export-${date}.json`);
+  } else if (format === 'csv') {
+    const headers = ['id', 'type', 'date', 'timestamp', 'text', 'amount', 'tags', 'source', 'todo_meta'];
+    const rows = entries.map(e => [e.id, e.type, e.date, e.timestamp, e.text, e.amount, e.tags ? e.tags.join(';') : '', e.source, e.todoMeta ? JSON.stringify(e.todoMeta) : ''].map(formatCsvField));
+    const data = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    downloadBlob(new Blob([data], { type: 'text/csv;charset=utf-8;' }), `alertjar-export-${date}.csv`);
+  }
+  showToast(`Exported as ${format.toUpperCase()}`, 'success');
 }
 
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
-
 
 document.getElementById('import-json').onchange = (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  
   const reader = new FileReader();
-  reader.onload = (event) => {
+  reader.onload = async (event) => {
     try {
       const entries = JSON.parse(event.target.result);
       if (!Array.isArray(entries)) throw new Error("JSON is not an array");
-
       const transaction = db.transaction(['entries'], 'readwrite');
       const store = transaction.objectStore('entries');
       entries.forEach(entry => store.put(entry));
-      
-      transaction.oncomplete = () => {
-        showToast('Import successful', 'success');
-        refreshAll();
-      };
+      transaction.oncomplete = () => { showToast('Import successful', 'success'); refreshAll(); };
       transaction.onerror = () => showToast('Import failed', 'error');
-    } catch (error) {
-      showToast('Invalid JSON file', 'error');
-    }
+    } catch (error) { showToast('Invalid JSON file', 'error'); }
   };
   reader.readAsText(file);
   e.target.value = '';
 };
 
+// Theme Management
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    if(chartInstance) renderDistributionGraph(); // Re-render chart with new colors
+}
+function toggleTheme() {
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+}
+(function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(savedTheme || (prefersDark ? 'dark' : 'light'));
+})();
+
+
 // Event Listeners
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+const debounce = (func, wait) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => func(...a), wait); }; };
+
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
     if (btn.dataset.tab === 'graphs') renderDistributionGraph();
-  });
-});
+}));
+document.querySelectorAll('.sub-tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    const parent = btn.closest('.sub-tab-nav').dataset.parent;
+    document.querySelectorAll(`#${parent}-tab .sub-tab-btn, #${parent}-tab .sub-tab-content`).forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`${btn.dataset.tab}-subtab`).classList.add('active');
+}));
+document.querySelectorAll('.graph-period-selector .btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.graph-period-selector .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderDistributionGraph();
+}));
 
-document.querySelectorAll('.sub-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const parent = btn.closest('.sub-tab-nav').dataset.parent;
-        document.querySelectorAll(`#${parent}-tab .sub-tab-btn`).forEach(b => b.classList.remove('active'));
-        document.querySelectorAll(`#${parent}-tab .sub-tab-content`).forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(`${btn.dataset.tab}-subtab`).classList.add('active');
-    });
-});
-
-document.querySelectorAll('.graph-period-selector .btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.graph-period-selector .btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderDistributionGraph();
-    });
-});
-
-document.getElementById('download-chart').onclick = () => {
-    if (chartInstance) {
-        const url = chartInstance.toBase64Image();
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `alertjar-chart-${getLocalDate()}.png`;
-        a.click();
-    }
-};
-
-
-document.getElementById('record-asset').onclick = () => startRecording('asset');
-document.getElementById('record-liability').onclick = () => startRecording('liability');
-document.getElementById('record-diary').onclick = () => startRecording('diary');
-
+// Main actions
+document.getElementById('record-asset').onclick = () => handleRecordButtonClick('asset');
+document.getElementById('record-liability').onclick = () => handleRecordButtonClick('liability');
+document.getElementById('record-diary').onclick = () => handleRecordButtonClick('diary');
 document.getElementById('add-asset').onclick = () => addEntry('asset', document.getElementById('manual-asset').value);
 document.getElementById('add-liability').onclick = () => addEntry('liability', document.getElementById('manual-liability').value);
 document.getElementById('add-diary').onclick = () => addDiaryEntry(document.getElementById('manual-diary').value);
 document.getElementById('add-todo').onclick = addTodo;
-
 document.getElementById('search-diary').addEventListener('input', debounce(refreshDiary, 300));
+document.getElementById('download-chart').onclick = () => { if (chartInstance) downloadBlob(chartInstance.toBase64Image(), `alertjar-chart-${getLocalDate()}.png`); };
 
-document.querySelector('.help-btn').onclick = () => document.getElementById('help-modal').classList.add('active');
-document.getElementById('help-modal').querySelector('.modal-close').onclick = () => document.getElementById('help-modal').classList.remove('active');
-document.getElementById('day-modal').querySelector('.modal-close').onclick = () => document.getElementById('day-modal').classList.remove('active');
+// Modals and toggles
+document.getElementById('help-btn').onclick = () => document.getElementById('help-modal').classList.add('active');
+document.getElementById('theme-toggle').onclick = toggleTheme;
+document.querySelectorAll('.modal-close').forEach(btn => btn.onclick = () => btn.closest('.modal').classList.remove('active'));
 
+// Calendar nav
 document.getElementById('prev-month').onclick = () => { currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() - 1); renderCalendar(); };
 document.getElementById('next-month').onclick = () => { currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() + 1); renderCalendar(); };
 document.getElementById('today-btn').onclick = () => { currentCalendarMonth = new Date(); renderCalendar(); };
 
+// Export buttons
 document.getElementById('export-json').onclick = () => exportData('json');
 document.getElementById('export-csv').onclick = () => exportData('csv');
 
+// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'h') { e.preventDefault(); document.getElementById('help-modal').classList.toggle('active'); } 
-  else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-    const activeTab = document.querySelector('.tab-btn.active');
-    if (e.key === 'ArrowLeft') { (activeTab.previousElementSibling || document.querySelector('.tab-btn:last-of-type')).click(); }
-    else if (e.key === 'ArrowRight') { (activeTab.nextElementSibling || document.querySelector('.tab-btn:first-of-type')).click(); }
+  else if (!e.target.matches('input, textarea')) {
+    const tabs = [...document.querySelectorAll('.tab-btn')];
+    const currentIndex = tabs.findIndex(tab => tab.classList.contains('active'));
+    if (e.key === 'ArrowLeft') tabs[(currentIndex - 1 + tabs.length) % tabs.length].click();
+    else if (e.key === 'ArrowRight') tabs[(currentIndex + 1) % tabs.length].click();
   }
 });
 
 // Initial Setup
-initSpeechRecognition();
+const refreshAll = () => Promise.all([ refreshEntries('asset'), refreshEntries('liability'), refreshDiary(), refreshTodos(), renderCalendar(), document.querySelector('.tab-btn.active[data-tab="graphs"]') && renderDistributionGraph() ]);
 initDB().then(() => {
   refreshAll();
   checkMissedTasks();
   setInterval(checkMissedTasks, 5 * 60 * 1000);
-}).catch(error => {
-  console.error('Database initialization failed:', error);
-  showToast('Failed to initialize app.', 'error');
-});
+}).catch(error => { showToast('Failed to initialize app.', 'error'); });
+initSpeechRecognition();
 
-function refreshAll() {
-  refreshEntries('asset');
-  refreshEntries('liability');
-  refreshDiary();
-  refreshTodos();
-  renderCalendar();
-  if (document.querySelector('.tab-btn[data-tab="graphs"]').classList.contains('active')) {
-      renderDistributionGraph();
-  }
-}
-
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => { clearTimeout(timeout); func(...args); };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
 </script>
 </body>
 </html>

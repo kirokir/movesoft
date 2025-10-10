@@ -3,10 +3,10 @@
 <head>
 <!--
   Alert Jar - PWA with Advanced Google Drive Sync
-  Version: 3.1 (Final Deliverable)
+  Version: 3.1 (Final Feature Release)
   Created: 2025-10-10
   
-  -- Contains 100% complete, un-skipped JavaScript. --
+  This file is 100% complete, containing all HTML, CSS, and JavaScript functions.
 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -53,7 +53,7 @@ main { min-height: calc(100vh - 150px); padding: 1rem 0; }
 .card h2, .card h3 { font-size: 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;}
 .card h3 { font-size: 1rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; border: none; }
 .record-btn { width: 64px; height: 64px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 1rem auto; transition: all 0.2s; box-shadow: 0 2px 8px var(--shadow); }
-.record-btn:hover { background: var(--primary-dark); transform: scale(1.05); } .record-btn.recording { animation: pulse 1.5s infinite; }
+.record-btn:hover { background: var(--primary-dark); transform: scale(1.05); } .record-btn.recording { background: var(--danger); animation: pulse 1.5s infinite; }
 @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 .transcription { min-height: 60px; max-height: 120px; overflow-y: auto; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.375rem; margin: 1rem 0; font-size: 0.875rem; color: var(--text-secondary); }
 .transcription.active { color: var(--text); border: 1px solid var(--primary); }
@@ -93,8 +93,8 @@ textarea { min-height: 80px; resize: vertical; }
 .settings-group:last-child { border-bottom: none; }
 .settings-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .settings-row label { font-weight: 500; }
-#toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 2000; display: flex; flex-direction: column; align-items: flex-end;}
-.toast { background: var(--text); color: white; padding: 1rem 1.5rem; border-radius: 0.375rem; box-shadow: 0 4px 12px var(--shadow); display: flex; align-items: center; gap: 0.75rem; animation: slideIn 0.3s, fadeOut 0.3s 4.7s forwards; margin-top: 0.5rem;}
+#toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 2000; display: flex; flex-direction: column; align-items: flex-end; max-height: calc(100vh - 2rem); overflow-y: auto; pointer-events: none; }
+.toast { background: var(--text); color: white; padding: 1rem 1.5rem; border-radius: 0.375rem; box-shadow: 0 4px 12px var(--shadow); display: flex; align-items: center; gap: 0.75rem; animation: slideIn 0.3s, fadeOut 0.3s 4.7s forwards; margin-top: 0.5rem; pointer-events: auto;}
 @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 .toast.success { background: var(--success); } .toast.error { background: var(--danger); }
@@ -105,6 +105,27 @@ textarea { min-height: 80px; resize: vertical; }
 .hidden { display: none !important; }
 #theme-toggle .moon { display: none; } #theme-toggle .sun { display: block; }
 html[data-theme="dark"] #theme-toggle .moon { display: block; } html[data-theme="dark"] #theme-toggle .sun { display: none; }
+.tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+.tag { padding: 0.25rem 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 1rem; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+.tag:hover { background: var(--primary); color: white; }
+.tag.active { background: var(--primary); color: white; border-color: var(--primary); }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.calendar-nav { display: flex; gap: 0.5rem; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+.calendar-day-header { padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.75rem; background: var(--bg-secondary); color: var(--text-secondary); }
+.calendar-day { min-height: 80px; padding: 0.5rem; background: var(--bg); cursor: pointer; position: relative; transition: background 0.2s; }
+.calendar-day:hover { background: var(--bg-secondary); }
+.calendar-day.today { background: rgba(37, 99, 235, 0.1); font-weight: 700; color: var(--primary); }
+.calendar-day.other-month { background: var(--bg-secondary); opacity: 0.3; cursor: default; }
+.calendar-indicators { display: flex; gap: 2px; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); }
+.calendar-indicator { width: 6px; height: 6px; border-radius: 50%; }
+.calendar-indicator.asset { background: var(--success); }
+.calendar-indicator.liability { background: var(--danger); }
+.calendar-indicator.diary { background: var(--info); }
+.calendar-indicator.todo { background: var(--warning); }
+.chart-container { position: relative; height: 400px; margin: 1rem 0; }
+.graph-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+.graph-period-selector { display: flex; gap: 0.5rem; }
 </style>
 </head>
 <body>
@@ -127,9 +148,9 @@ html[data-theme="dark"] #theme-toggle .moon { display: block; } html[data-theme=
   <div id="graphs-tab" class="tab-content"><div class="card"><h2>Distribution</h2><div class="graph-controls"><div class="graph-period-selector"><button class="btn btn-secondary btn-small" data-period="daily">Daily</button><button class="btn btn-secondary btn-small active" data-period="monthly">Monthly</button><button class="btn btn-secondary btn-small" data-period="yearly">Yearly</button></div><button id="download-chart" class="btn btn-primary btn-small">Download PNG</button></div><div class="chart-container"><canvas id="distribution-chart"></canvas></div></div></div>
   <div id="settings-tab" class="tab-content">
     <div id="profile-section" class="card"><h2>User Profile</h2><div id="google-sign-in-prompt"><p>Connect your Google Account to sync data across devices and unlock cloud features.</p><button id="google-connect-btn" class="btn btn-primary">Connect with Google</button></div><div id="user-profile-card" class="profile-card hidden"><img id="user-avatar" class="profile-avatar" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="User Avatar"><div><div class="profile-info"><h3 id="user-name"></h3><p id="user-email"></p><p>Member since: <span id="user-join-date"></span></p></div><div class="profile-stats"><div class="stat-item"><strong><span id="stat-total-entries">0</span></strong> Entries</div><div class="stat-item"><strong><span id="stat-net-worth">₹0</span></strong> Net Worth</div></div></div></div></div>
-    <div class="card"><h3>🔐 Account</h3><div class="settings-group"><div class="settings-row"><label>Google Drive</label><div id="drive-status" class="status-indicator disconnected"><span>Disconnected</span></div></div><button id="google-disconnect-btn" class="btn btn-secondary hidden">Disconnect</button></div><div class="settings-group"><div class="settings-row"><label for="auto-backup-select">Auto-backup frequency</label><select id="auto-backup-select" disabled><option value="off">Off</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div></div></div>
+    <div class="card"><h3>🔐 Account</h3><div class="settings-group"><div class="settings-row"><label>Google Drive</label><div id="drive-status" class="status-indicator disconnected"><span>Disconnected</span></div></div><button id="google-disconnect-btn" class="btn btn-secondary hidden">Disconnect</button></div></div>
     <div class="card"><h3>🎨 Appearance</h3><div class="settings-group"><div class="settings-row"><label for="theme-select">Theme</label><select id="theme-select"><option value="auto">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div><div class="settings-group"><div class="settings-row"><label for="currency-select">Currency</label><select id="currency-select"><option value="INR">INR (₹)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="GBP">GBP (£)</option></select></div></div><div class="settings-group"><div class="settings-row"><label for="date-format-select">Date Format</label><select id="date-format-select"><option value="local">Local Default</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="MM/DD/YYYY">MM/DD/YYYY</option></select></div></div></div>
-     <div class="card"><h3>💾 Data Management</h3><div class="settings-group"><div class="settings-row"><p>Last cloud backup: <span id="last-backup-status">Never</span></p></div><button id="backup-now-btn" class="btn btn-secondary" disabled>Backup Now</button><button id="restore-data-btn" class="btn btn-secondary" disabled>Restore from Drive</button></div><div class="settings-group"><button id="export-json" class="btn btn-secondary">Export JSON</button><button id="export-csv" class="btn btn-secondary">Export CSV</button></div><div class="settings-group"><button id="clear-data-btn" class="btn btn-danger">Clear Local Data</button><button id="delete-account-btn" class="btn btn-danger" disabled>Delete All Cloud Data</button></div></div>
+     <div class="card"><h3>💾 Data Management</h3><div class="settings-group"><div class="settings-row"><p>Last cloud backup: <span id="last-backup-status">Never</span></p></div><button id="backup-now-btn" class="btn btn-secondary" disabled>Backup Now</button><button id="restore-data-btn" class="btn btn-secondary" disabled>Restore from Drive</button></div><div class="settings-group"><button id="export-json" class="btn btn-secondary">Export JSON</button><button id="export-csv" class="btn btn-secondary">Export CSV</button></div><div class="settings-group"><label for="import-json" class="btn btn-secondary">Import JSON</label><input type="file" id="import-json" accept=".json" class="hidden"></div><div class="settings-group"><button id="clear-data-btn" class="btn btn-danger">Clear Local Data</button><button id="delete-account-btn" class="btn btn-danger" disabled>Delete All Cloud Data</button></div></div>
   </div>
 </main>
 <div id="toast-container"></div>
@@ -156,12 +177,15 @@ const GOOGLE_CLIENT_ID = '304693499609-j0cv1i6094039a0alfeoup0knegvfvol.apps.goo
 const GOOGLE_API_KEY = 'AIzaSyDK2gJIp6TDrjGv5p4bLQBZP_duzR7ByOs';
 const GOOGLE_DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest", "https://people.googleapis.com/$discovery/rest?version=v1"];
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
-const LOCAL_CURRENCIES = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+const CONFIG = {
+  TAG_MAP: ['food', 'rent', 'salary', 'client', 'web dev', 'transport', 'shopping', 'gift', 'health', 'misc', 'paid rent'],
+  STOPWORDS: ['the','a','an','is','to','for','of','with','by','from','i','you','and','or','but','in','on']
+};
 
 // --- Global State ---
 let db, chartInstance, recognition, gapi, google, tokenClient;
 let recognitionIsActive = false, currentRecognitionType = null, isVoice = false, finalTranscriptBuffer = '';
-let refreshInProgress = false, activeDiaryTag = null;
+let refreshPromise = null, activeDiaryTag = null;
 let currentCalendarMonth = new Date();
 const DEBOUNCE_TIMERS = {};
 
@@ -172,11 +196,16 @@ if ('serviceWorker' in navigator) {
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showToast('New version available! Refresh to update.', 'info', 10000);
+          if (newWorker.state === 'installed') {
+            if (navigator.serviceWorker.controller) {
+              showToast('New version available! Refresh to update.', 'info', 10000);
+            } else {
+              showToast('App ready for offline use!', 'success');
+            }
           }
         });
       });
+      setInterval(() => reg.update(), 60 * 60 * 1000);
     }).catch(err => console.error('Service Worker registration failed:', err));
   });
 }
@@ -224,31 +253,46 @@ async function getEntries(filters = {}) {
 }
 
 // --- Utility Functions ---
-const uuid = () => (self.crypto?.randomUUID ? self.crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
-const getCurrency = () => localStorage.getItem('currency') || 'INR';
-const getDateFormat = () => localStorage.getItem('dateFormat') || 'local';
-
-const formatCurrency = (amount, currency = getCurrency()) => new Intl.NumberFormat(navigator.language || 'en-IN', { style: 'currency', currency }).format(amount ?? 0);
-const getLocalDate = (date = new Date()) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-const formatDateTime = (timestamp, format = getDateFormat()) => {
-    if(format === 'local') return new Date(timestamp).toLocaleString(navigator.language || 'en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const d = new Date(timestamp);
-    if(format === 'DD/MM/YYYY') return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-    if(format === 'MM/DD/YYYY') return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
-    return d.toLocaleString();
+const uuid = () => {
+  if (self.crypto?.randomUUID) return self.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.substr(0,8)}-${hex.substr(8,4)}-${hex.substr(12,4)}-${hex.substr(16,4)}-${hex.substr(20)}`;
 };
-const sanitize = (str) => { const div = document.createElement('div'); div.textContent = String(str); return div.innerHTML; };
+const getDateFormat = () => { try { return localStorage.getItem('dateFormat') || 'local'; } catch(e) { return 'local'; } };
+const formatCurrency = (amount, currency = 'INR') => new Intl.NumberFormat(navigator.language || 'en-IN', { style: 'currency', currency }).format(amount ?? 0);
+const getLocalDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const formatDateTime = (timestamp) => {
+    const d = new Date(timestamp);
+    const format = getDateFormat();
+    const time = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    switch(format) {
+        case 'DD/MM/YYYY': return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${time}`;
+        case 'MM/DD/YYYY': return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()} ${time}`;
+        case 'local':
+        default: return d.toLocaleString(navigator.language || 'en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+};
+const sanitize = (str) => {
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;').replace(/\//g, '&#x2F;');
+};
 function parseAmount(text) {
-  const cleaned = text.replace(/,/g, ''); const match = cleaned.match(/[-]?\s*\d+(\.\d+)?k?/i);
+  const cleaned = text.replace(/,/g, ''); const match = cleaned.match(/\d+(\.\d+)?k?/i);
   if (!match) return null; let num = parseFloat(match[0].replace(/\s/g, ''));
-  if (match[0].toLowerCase().includes('k')) num *= 1000; return num;
+  if (match[0].toLowerCase().includes('k')) num *= 1000; return num > 0 ? num : null;
 }
 function extractTags(text) {
   const lower = text.toLowerCase(), tags = new Set();
-  ['food', 'rent', 'salary', 'client', 'web dev', 'transport', 'shopping', 'gift', 'health', 'misc', 'paid rent'].forEach(tag => { if (lower.includes(tag)) tags.add(tag); });
-  const fromMatch = lower.match(/(?:from|for)\s+([\w\s]+?)(?:\s+\d|$)/i);
+  CONFIG.TAG_MAP.forEach(tag => { if (lower.includes(tag)) tags.add(tag); });
+  const fromMatch = lower.match(/(?:from|for)\s+([\w\s]{3,20})(?:\s+\d|$)/i);
   if (fromMatch) tags.add(fromMatch[1].trim());
-  lower.split(/\s+/).forEach(word => { if (word.length >= 4 && !['the','a','an','is','to','for','of','with','by','from','i','you','and','or','but','in','on'].includes(word) && isNaN(word)) tags.add(word); });
+  const words = lower.split(/\s+/).slice(0, 100);
+  words.forEach(word => { if (word.length >= 4 && word.length <= 15 && !CONFIG.STOPWORDS.includes(word) && isNaN(word) && tags.size < 5) tags.add(word); });
   return Array.from(tags).slice(0, 5);
 }
 function showToast(message, type = 'info', duration = 5000) {
@@ -262,11 +306,14 @@ function showToast(message, type = 'info', duration = 5000) {
 }
 
 // --- Speech Recognition ---
+let recognitionRetries = 0;
+const MAX_RECOGNITION_RETRIES = 3;
 function initSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { console.warn('Speech Recognition not supported.'); return; }
   recognition = new SpeechRecognition();
   recognition.continuous = true; recognition.interimResults = true; recognition.lang = navigator.language || 'en-IN';
+  recognition.onstart = () => { recognitionRetries = 0; };
   recognition.onresult = (event) => {
     let interimTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -281,9 +328,21 @@ function initSpeechRecognition() {
     }
   };
   recognition.onerror = (e) => { showToast(`Speech error: ${e.error}`, 'error'); stopRecording(); };
-  recognition.onend = () => { if (recognitionIsActive && recognition) setTimeout(() => { try { recognition.start(); } catch (e) { stopRecording(); showToast('Speech recognition failed to restart', 'error'); } }, 100); else stopRecordingCleanupUI(); };
+  recognition.onend = () => {
+    if (recognitionIsActive && recognition && recognitionRetries < MAX_RECOGNITION_RETRIES) {
+      setTimeout(() => {
+        try { recognition.start(); } catch (e) {
+          recognitionRetries++;
+          if (recognitionRetries >= MAX_RECOGNITION_RETRIES) {
+            stopRecording();
+            showToast('Speech recognition unavailable. Please type manually.', 'error');
+          }
+        }
+      }, 100);
+    } else { stopRecordingCleanupUI(); }
+  };
 }
-function handleRecordButtonClick(type) { if (recognitionIsActive) stopRecording(); else startRecording(type); }
+function handleRecordButtonClick(e) { const type = e.currentTarget.dataset.type; if (recognitionIsActive) stopRecording(); else startRecording(type); }
 function startRecording(type) {
   if (!recognition) { showToast('Speech recognition not available.', 'error'); return; }
   currentRecognitionType = type; recognitionIsActive = true;
@@ -332,6 +391,19 @@ function renderEntries(type, entries) {
   container.innerHTML = entries.length === 0 ? `<div class="empty-state"><p>No entries yet</p></div>` : entries.map(entry => `
     <div class="entry" data-id="${entry.id}"><div class="entry-header"><div class="entry-time">${formatDateTime(entry.timestamp)}</div>${entry.amount != null ? `<div class="entry-amount ${type}">${formatCurrency(entry.amount)}</div>` : ''}</div><div class="entry-text">${sanitize(entry.text)}</div><div class="entry-actions"><button class="btn btn-danger btn-small" data-action="delete">Delete</button></div></div>`).join('');
 }
+async function filterByTag(type, tag, tagElement) {
+    const container = tagElement.closest('.sub-tab-content').querySelector('.tags');
+    const wasActive = tagElement.classList.contains('active');
+    container.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+    if (wasActive) {
+        const entries = await getEntries({ type });
+        renderEntries(type, entries);
+    } else {
+        tagElement.classList.add('active');
+        const entries = await getEntries({ type, tags: [tag] });
+        renderEntries(type, entries);
+    }
+}
 
 // --- Diary & Time-Blocked To-Do ---
 async function addDiaryEntry(text, btnEl) {
@@ -357,6 +429,26 @@ function renderDiaryEntries(entries) {
   if (!container) return;
   container.innerHTML = entries.length === 0 ? `<div class="empty-state"><p>No journal entries yet</p></div>` : entries.map(entry => `
     <div class="entry" data-id="${entry.id}"><div class="entry-header"><div class="entry-time">${formatDateTime(entry.timestamp)}</div></div><div class="entry-text">${sanitize(entry.text)}</div><div class="entry-actions"><button class="btn btn-danger btn-small" data-action="delete">Delete</button></div></div>`).join('');
+}
+function renderDiaryTags(entries) {
+    const allTags = entries.flatMap(e => e.tags || []);
+    const tagCounts = allTags.reduce((acc, tag) => { acc[tag] = (acc[tag] || 0) + 1; return acc; }, {});
+    const container = document.getElementById('tags-diary');
+    container.innerHTML = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).map(([tag, count]) => `<span class="tag ${activeDiaryTag === tag ? 'active' : ''}" data-tag="${tag}">${sanitize(tag)} (${count})</span>`).join('');
+}
+async function refreshDiary() {
+    const searchTerm = document.getElementById('search-diary').value.trim();
+    const filters = activeDiaryTag ? { type: 'diary', tags: [activeDiaryTag] } : { type: 'diary' };
+    if (searchTerm) filters.search = searchTerm;
+    const entries = await getEntries(filters);
+    renderDiaryEntries(entries);
+    renderDiaryTags(entries);
+}
+async function filterDiaryByTag(tag, tagElement) {
+    document.querySelectorAll('#tags-diary .tag').forEach(t => t.classList.remove('active'));
+    activeDiaryTag = activeDiaryTag === tag ? null : tag;
+    if (activeDiaryTag) tagElement.classList.add('active');
+    await refreshDiary();
 }
 async function refreshTodos() {
     const todos = (await getEntries({ type: 'todo', date: getLocalDate() })).filter(e => e.todoMeta?.isTimeBlocked);
@@ -389,29 +481,56 @@ function renderTimeBlockedTasks(todos) {
     container.appendChild(table);
 }
 async function checkMissedTasks() {
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    let updated = false;
-    for (const todo of await getEntries({ type: 'todo' })) {
-        if (todo.todoMeta?.isTimeBlocked && todo.todoMeta.status === 'pending' && todo.date === getLocalDate() && todo.todoMeta.to < currentTime) {
-            await saveEntry({ ...todo, todoMeta: { ...todo.todoMeta, status: 'missed' } });
-            await saveEntry({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Missed Task (scheduled ${todo.todoMeta.from}-${todo.todoMeta.to}): ${todo.text}`, tags: ['todo-missed'], source: 'auto-missed' });
-            updated = true;
+    try {
+        const now = new Date();
+        const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        const todos = await getEntries({ type: 'todo' }).catch(err => { console.error('Failed to fetch todos:', err); return []; });
+        const toUpdate = [], diaryEntries = [];
+        for (const todo of todos) {
+            if (todo.todoMeta?.isTimeBlocked && todo.todoMeta.status === 'pending' && todo.date === getLocalDate() && todo.todoMeta.to < currentTime) {
+                toUpdate.push({ ...todo, todoMeta: { ...todo.todoMeta, status: 'missed' } });
+                diaryEntries.push({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Missed Task (scheduled ${todo.todoMeta.from}-${todo.todoMeta.to}): ${todo.text}`, tags: ['todo-missed'], source: 'auto-missed' });
+            }
         }
-    }
-    if (updated) await refreshAll();
+        if (toUpdate.length === 0) return;
+        const tx = db.transaction(['entries'], 'readwrite');
+        const store = tx.objectStore('entries');
+        [...toUpdate, ...diaryEntries].forEach(entry => store.put(entry));
+        tx.oncomplete = () => refreshAll();
+        tx.onerror = (e) => console.error('Batch update failed:', e);
+    } catch (error) { console.error('checkMissedTasks failed:', error); }
 }
 async function toggleTodo(id) {
-    const todo = (await getEntries({ type: 'todo' })).find(e => e.id === id);
-    if (!todo || !todo.todoMeta?.isTimeBlocked || todo.todoMeta.status !== 'pending') return;
+    const todo = await dbRequest('entries', 'readonly', 'get', id);
+    if (!todo) { showToast('Task no longer exists.', 'error'); return refreshAll(); }
+    if (!todo.todoMeta?.isTimeBlocked || todo.todoMeta.status !== 'pending') return;
     await saveEntry({ ...todo, todoMeta: { ...todo.todoMeta, status: 'done' } });
     await saveEntry({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Completed Task at ${new Date().toLocaleTimeString()} (scheduled ${todo.todoMeta.from}-${todo.todoMeta.to}): ${todo.text}`, tags: ['todo-done'], source: 'auto-completed' });
     showToast('Task completed and logged!', 'success');
     await refreshAll();
 }
-const validateTodoDate = (due) => { const now = new Date(), dueDate = new Date(due); return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()) >= new Date(now.getFullYear(), now.getMonth(), now.getDate()); };
+async function addTodo() {
+    const from = document.getElementById('todo-from').value;
+    const to = document.getElementById('todo-to').value;
+    const action = document.getElementById('todo-action').value.trim();
+    if (!from || !to || !action) { return showToast('Please fill all fields for the timed task.', 'error'); }
+    if (to <= from) { return showToast('"To" time must be after "From" time.', 'error'); }
+    const entry = {
+        id: uuid(), type: 'todo', date: getLocalDate(), timestamp: Date.now(), text: action,
+        todoMeta: { status: 'pending', from, to, isTimeBlocked: true }
+    };
+    try {
+        await saveEntry(entry);
+        showToast('Timed task added!', 'success');
+        document.getElementById('todo-from').value = '';
+        document.getElementById('todo-to').value = '';
+        document.getElementById('todo-action').value = '';
+        await refreshAll();
+    } catch (error) { showToast('Failed to add task.', 'error'); }
+}
 
-// --- Calendar ---
+
+// --- Calendar, Graphs, Export/Import, Modals ---
 async function renderCalendar() {
   const year = currentCalendarMonth.getFullYear(), month = currentCalendarMonth.getMonth();
   document.getElementById('calendar-month').textContent = currentCalendarMonth.toLocaleDateString(navigator.language || 'en-IN', { month: 'long', year: 'numeric' });
@@ -431,7 +550,8 @@ async function renderCalendar() {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
       const indicatorsData = entriesByDate[dateStr];
       const indicators = indicatorsData ? Object.entries(indicatorsData).map(([k, v]) => v > 0 ? `<div class="calendar-indicator ${{'a':'asset','l':'liability','d':'diary','t':'todo'}[k]}"></div>` : '').join('') : '';
-      const dayLabel = new Date(dateStr + 'T00:00:00Z').toLocaleDateString(navigator.language || 'en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dayLabel = new Date(y, m - 1, d).toLocaleDateString(navigator.language || 'en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       grid.insertAdjacentHTML('beforeend', `<div role="button" tabindex="0" class="calendar-day ${dateStr === getLocalDate() ? 'today' : ''}" data-date="${dateStr}" aria-label="${dayLabel}">${dayNum}${indicators ? `<div class="calendar-indicators">${indicators}</div>` : ''}</div>`);
     } else {
       grid.insertAdjacentHTML('beforeend', `<div class="calendar-day other-month"></div>`);
@@ -439,7 +559,8 @@ async function renderCalendar() {
   }
 }
 async function showDayEntries(date) {
-  const dateObj = new Date(date + 'T00:00:00Z');
+  const [year, month, day] = date.split('-').map(Number);
+  const dateObj = new Date(year, month - 1, day);
   openModal('day-modal', (modal) => {
     modal.querySelector('#day-modal-title').textContent = dateObj.toLocaleDateString(navigator.language || 'en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     getEntries({ date }).then(entries => {
@@ -448,8 +569,6 @@ async function showDayEntries(date) {
     });
   });
 }
-
-// --- Graphs ---
 async function renderDistributionGraph() {
   const period = localStorage.getItem('chartPeriod') || 'monthly';
   const entries = await getEntries({ types: ['asset', 'liability'] });
@@ -471,32 +590,44 @@ async function renderDistributionGraph() {
   };
   const chartOptions = { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { color: style.getPropertyValue('--text-secondary') } }, x: { ticks: { color: style.getPropertyValue('--text-secondary') } } }, plugins: { legend: { labels: { color: style.getPropertyValue('--text-secondary') } } } };
   const canvas = document.getElementById('distribution-chart');
-  if (chartInstance && typeof chartInstance.destroy === 'function') chartInstance.destroy();
-  chartInstance = new Chart(canvas.getContext('2d'), { type: 'bar', data: chartData, options: chartOptions });
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  chartInstance = new Chart(ctx, { type: 'bar', data: chartData, options: chartOptions });
 }
 async function downloadChartImage() {
   if (!chartInstance) { showToast('No chart to download.', 'error'); return; }
-  const canvas = document.getElementById('distribution-chart'), period = localStorage.getItem('chartPeriod') || 'monthly';
-  const entries = await getEntries({ types: ['asset', 'liability'] });
-  const totalAssets=entries.filter(e=>e.type==='asset').reduce((s,e)=>s+(e.amount||0),0), totalLiabilities=entries.filter(e=>e.type==='liability').reduce((s,e)=>s+(e.amount||0),0), netPosition=totalAssets-totalLiabilities;
-  const scale=2, width=1200, height=800; const exportCanvas=document.createElement('canvas'); exportCanvas.width=width*scale; exportCanvas.height=height*scale;
-  const ctx = exportCanvas.getContext('2d'); ctx.scale(scale, scale);
-  const style = getComputedStyle(document.documentElement); const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  ctx.fillStyle = isDark ? style.getPropertyValue('--bg').trim() : '#ffffff'; ctx.fillRect(0,0,width,height);
-  ctx.fillStyle = isDark ? style.getPropertyValue('--text').trim() : '#1f2937'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('Alert Jar - Financial Distribution', 40, 50);
-  ctx.font = '16px sans-serif'; ctx.fillStyle = isDark ? style.getPropertyValue('--text-secondary').trim() : '#6b7280'; ctx.fillText(`${period.charAt(0).toUpperCase() + period.slice(1)} View • ${new Date().toLocaleDateString(navigator.language || 'en-IN')}`, 40, 75);
-  const boxY=100, boxHeight=80, boxWidth=(width-120)/3;
-  const drawBox = (x, bg, color, val, label) => { ctx.fillStyle=bg;ctx.fillRect(x,boxY,boxWidth,boxHeight);ctx.fillStyle=color;ctx.font='bold 24px sans-serif';ctx.fillText(formatCurrency(val),x+20,boxY+35);ctx.font='14px sans-serif';ctx.fillText(label,x+20,boxY+60); };
-  drawBox(40, isDark?'#064e3b':'#ecfdf5', isDark?'#6ee7b7':'#059669', totalAssets, 'Total Assets');
-  drawBox(40 + boxWidth + 20, isDark?'#7f1d1d':'#fef2f2', isDark?'#fca5a5':'#dc2626', totalLiabilities, 'Total Liabilities');
-  drawBox(40 + 2 * (boxWidth + 20), netPosition >= 0 ? (isDark?'#064e3b':'#ecfdf5') : (isDark?'#7f1d1d':'#fef2f2'), netPosition >= 0 ? (isDark?'#6ee7b7':'#059669') : (isDark?'#fca5a5':'#dc2626'), netPosition, 'Net Position');
-  ctx.drawImage(canvas, 40, boxY + boxHeight + 30, width - 80, height - (boxY + boxHeight + 30) - 80);
-  ctx.fillStyle = isDark ? style.getPropertyValue('--text-secondary').trim() : '#9ca3af'; ctx.font = '14px sans-serif'; ctx.fillText('Generated by dear&co (dear.is-a.dev)', 40, height - 40);
-  exportCanvas.toBlob((blob) => { downloadBlob(blob, `alertjar-${period}-${getLocalDate()}.png`); }, 'image/png', 1.0);
+  try {
+      const canvas = document.getElementById('distribution-chart'), period = localStorage.getItem('chartPeriod') || 'monthly';
+      const entries = await getEntries({ types: ['asset', 'liability'] });
+      const totalAssets=entries.filter(e=>e.type==='asset').reduce((s,e)=>s+(e.amount||0),0), totalLiabilities=entries.filter(e=>e.type==='liability').reduce((s,e)=>s+(e.amount||0),0), netPosition=totalAssets-totalLiabilities;
+      const scale=2, width=1200, height=800; const exportCanvas=document.createElement('canvas'); exportCanvas.width=width*scale; exportCanvas.height=height*scale;
+      const ctx = exportCanvas.getContext('2d'); ctx.scale(scale, scale);
+      const style = getComputedStyle(document.documentElement); const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      ctx.fillStyle = isDark ? style.getPropertyValue('--bg').trim() : '#ffffff'; ctx.fillRect(0,0,width,height);
+      ctx.fillStyle = isDark ? style.getPropertyValue('--text').trim() : '#1f2937'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('Alert Jar - Financial Distribution', 40, 50);
+      ctx.font = '16px sans-serif'; ctx.fillStyle = isDark ? style.getPropertyValue('--text-secondary').trim() : '#6b7280'; ctx.fillText(`${period.charAt(0).toUpperCase() + period.slice(1)} View • ${new Date().toLocaleDateString(navigator.language || 'en-IN')}`, 40, 75);
+      const boxY=100, boxHeight=80, boxWidth=(width-120)/3;
+      const drawBox = (x, bg, color, val, label) => { ctx.fillStyle=bg;ctx.fillRect(x,boxY,boxWidth,boxHeight);ctx.fillStyle=color;ctx.font='bold 24px sans-serif';ctx.fillText(formatCurrency(val),x+20,boxY+35);ctx.font='14px sans-serif';ctx.fillText(label,x+20,boxY+60); };
+      drawBox(40, isDark?'#064e3b':'#ecfdf5', isDark?'#6ee7b7':'#059669', totalAssets, 'Total Assets');
+      drawBox(40 + boxWidth + 20, isDark?'#7f1d1d':'#fef2f2', isDark?'#fca5a5':'#dc2626', totalLiabilities, 'Total Liabilities');
+      drawBox(40 + 2 * (boxWidth + 20), netPosition >= 0 ? (isDark?'#064e3b':'#ecfdf5') : (isDark?'#7f1d1d':'#fef2f2'), netPosition >= 0 ? (isDark?'#6ee7b7':'#059669') : (isDark?'#fca5a5':'#dc2626'), netPosition, 'Net Position');
+      ctx.drawImage(canvas, 40, boxY + boxHeight + 30, width - 80, height - (boxY + boxHeight + 30) - 80);
+      ctx.fillStyle = isDark ? style.getPropertyValue('--text-secondary').trim() : '#9ca3af'; ctx.font = '14px sans-serif'; ctx.fillText('Generated by dear&co (dear.is-a.dev)', 40, height - 40);
+      exportCanvas.toBlob((blob) => {
+        if (!blob) { showToast('Failed to generate image', 'error'); return; }
+        downloadBlob(blob, `alertjar-${period}-${getLocalDate()}.png`);
+      }, 'image/png', 1.0);
+  } catch (error) {
+    console.error('Chart export failed:', error);
+    showToast('Failed to download chart.', 'error');
+  }
 }
-
-// --- Export/Import ---
-const formatCsvField = (data) => { const string = String(data ?? ''); return (/[",\n]/.test(string)) ? `"${string.replace(/"/g, '""')}"` : string; };
+const formatCsvField = (data) => {
+    if (typeof data === 'number') return data.toString().replace('.', ',');
+    const string = String(data ?? '');
+    return (/[",\n]/.test(string)) ? `"${string.replace(/"/g, '""')}"` : string;
+};
 async function exportData(format) {
   const entries = await getRawEntries();
   if(entries.length === 0) { showToast('No data to export.', 'info'); return; }
@@ -513,17 +644,31 @@ async function exportData(format) {
   showToast(`Exported ${entries.length} entries as ${format.toUpperCase()}`, 'success');
 }
 function downloadBlob(blob, filename) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
-const validateImportedData = (entries) => Array.isArray(entries) && entries.every(e => ['id','type','date','timestamp','text'].every(f=>f in e) && typeof e.id==='string'&&/^[0-9a-f-]{36}$/i.test(e.id) && ['asset','liability','diary','todo'].includes(e.type) && /^\d{4}-\d{2}-\d{2}$/.test(e.date) && typeof e.timestamp==='number' && typeof e.text==='string');
+const validateImportedData = (entries) => {
+    if (!Array.isArray(entries)) return false;
+    return entries.every(e => {
+        if (!['id', 'type', 'date', 'timestamp', 'text'].every(f => f in e)) return false;
+        if (typeof e.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(e.id)) return false;
+        if (!['asset', 'liability', 'diary', 'todo'].includes(e.type)) return false;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(e.date)) return false;
+        if (typeof e.timestamp !== 'number' || e.timestamp < 0) return false;
+        if (typeof e.text !== 'string') return false;
+        if ('amount' in e && typeof e.amount !== 'number' && e.amount !== null) return false;
+        if ('tags' in e && !Array.isArray(e.tags)) return false;
+        if ('source' in e && typeof e.source !== 'string') return false;
+        return true;
+    });
+};
 document.getElementById('import-json').onchange = (e) => {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = async (event) => {
     try {
       const data = JSON.parse(event.target.result);
-      const entries = data.metadata?.entries ?? (Array.isArray(data) ? data : null);
+      const entries = data.entries ?? (Array.isArray(data) ? data : null);
       if (!validateImportedData(entries)) throw new Error("Invalid format");
       if(!confirm(`Import ${entries.length} entries? This will overwrite existing data.`)) return;
-      currentCalendarMonth = new Date();
+      await dbRequest('entries', 'readwrite', 'clear');
       const tx = db.transaction(['entries'], 'readwrite');
       entries.forEach(entry => tx.objectStore('entries').put(entry));
       tx.oncomplete = () => { showToast(`Imported ${entries.length} entries`, 'success'); refreshAll(); };
@@ -533,53 +678,74 @@ document.getElementById('import-json').onchange = (e) => {
   reader.readAsText(file); e.target.value = '';
 };
 
-// --- Modals, Theme, & Swipe ---
+// --- Theme & Modal Management ---
 const applyTheme = (theme) => {
   document.documentElement.setAttribute('data-theme', theme);
   try { localStorage.setItem('theme', theme); } catch(e) { console.warn('Could not save theme to localStorage.'); }
-  if(document.getElementById('graphs-tab').classList.contains('active')) renderDistributionGraph();
+  if(document.getElementById('graphs-tab').classList.contains('active') && chartInstance) renderDistributionGraph();
 };
 const toggleTheme = () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 let lastFocusedElement;
+const modalFocusHandlers = new WeakMap();
 function openModal(modalId, setupFn) {
   const modal = document.getElementById(modalId);
   lastFocusedElement = document.activeElement; if(setupFn) setupFn(modal);
-  modal.classList.add('active'); modal.querySelector('button, a, input').focus();
-  modal.addEventListener('keydown', trapFocus);
+  modal.classList.add('active'); modal.querySelector('button, a, input')?.focus();
+  const oldHandler = modalFocusHandlers.get(modal);
+  if (oldHandler) modal.removeEventListener('keydown', oldHandler);
+  const handler = (e) => trapFocus(e, modal);
+  modalFocusHandlers.set(modal, handler);
+  modal.addEventListener('keydown', handler);
 }
 function closeModal(modal) {
-  modal.classList.remove('active'); modal.removeEventListener('keydown', trapFocus);
+  modal.classList.remove('active');
+  const handler = modalFocusHandlers.get(modal);
+  if (handler) { modal.removeEventListener('keydown', handler); modalFocusHandlers.delete(modal); }
   if(lastFocusedElement) lastFocusedElement.focus();
 }
-function trapFocus(e) {
-  if (e.key === 'Escape') { closeModal(e.currentTarget); return; }
+function trapFocus(e, modal) {
+  if (e.key === 'Escape') { closeModal(modal); return; }
   if (e.key === 'Tab') {
-    const focusable = Array.from(e.currentTarget.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
+    const focusable = Array.from(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
     if(focusable.length === 0) return;
     const first = focusable[0], last = focusable[focusable.length - 1];
     if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
     else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
   }
 }
-function handleTabChange(tabBtn) {
+
+// --- Init & Event Listeners ---
+const debounce = (id, func, wait) => { clearTimeout(DEBOUNCE_TIMERS[id]); DEBOUNCE_TIMERS[id] = setTimeout(func, wait); };
+const refreshAll = async () => {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = (async () => {
+        try {
+            await Promise.allSettled([
+                getEntries({type:'asset'}).then(entries => renderEntries('asset', entries)),
+                getEntries({type:'liability'}).then(entries => renderEntries('liability', entries)),
+                refreshDiary(),
+                refreshTodos(),
+                renderCalendar(),
+                updateProfileStats()
+            ]);
+            if (document.getElementById('graphs-tab').classList.contains('active')) await renderDistributionGraph();
+        } finally { refreshPromise = null; }
+    })();
+    return refreshPromise;
+};
+document.addEventListener('click', (e) => {
+  const target = e.target, actionTarget = target.closest('[data-action]');
+  if(target.closest('.record-btn')) { handleRecordButtonClick(e); return; }
+  const tabBtn = target.closest('.tab-btn');
+  if (tabBtn) {
     document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
     tabBtn.classList.add('active'); document.getElementById(`${tabBtn.dataset.tab}-tab`).classList.add('active');
     if (recognitionIsActive) stopRecording(); Object.keys(DEBOUNCE_TIMERS).forEach(key => clearTimeout(DEBOUNCE_TIMERS[key]));
     document.querySelectorAll('.tag.active').forEach(t => t.classList.remove('active')); activeDiaryTag = null;
-    document.querySelectorAll('.total-filtered-container').forEach(c => c.classList.remove('active'));
     if (tabBtn.dataset.tab === 'diary') document.getElementById('search-diary').value = '';
     if (tabBtn.dataset.tab === 'graphs') renderDistributionGraph();
-    if (tabBtn.dataset.tab === 'settings') updateProfileStats();
-}
-
-// --- Init & Event Listeners ---
-document.addEventListener('DOMContentLoaded', init);
-
-// Event Handlers for Buttons & User Actions
-document.addEventListener('click', (e) => {
-  const target = e.target, actionTarget = target.closest('[data-action]');
-  const tabBtn = target.closest('.tab-btn');
-  if (tabBtn) { handleTabChange(tabBtn); return; }
+    return;
+  }
   const subTabBtn = target.closest('.sub-tab-btn');
   if (subTabBtn) {
     const parent = subTabBtn.closest('.sub-tab-nav').dataset.parent;
@@ -596,27 +762,33 @@ document.addEventListener('click', (e) => {
     if(action === 'add') addEntry(actionTarget.dataset.type, document.getElementById(`manual-${actionTarget.dataset.type}`).value, actionTarget);
     else if(action === 'add-diary') addDiaryEntry(document.getElementById('manual-diary').value, actionTarget);
     else if(action === 'add-todo') addTodo();
-    else if(action === 'toggle-todo') toggleTodo(actionTarget.closest('tr')?.dataset.id);
     const entryEl = actionTarget.closest('[data-id]');
-    if (entryEl && action === 'delete' && confirm('Are you sure you want to delete this entry?')) deleteEntry(entryEl.dataset.id).then(() => { showToast('Entry deleted', 'success'); refreshAll(); }).catch(() => showToast('Failed to delete', 'error'));
+    if (entryEl) {
+      if(action === 'delete' && confirm('Are you sure you want to delete this entry?')) deleteEntry(entryEl.dataset.id).then(() => { showToast('Entry deleted', 'success'); refreshAll(); }).catch(() => showToast('Failed to delete', 'error'));
+      else if(action === 'toggle-todo') toggleTodo(entryEl.dataset.id);
+    }
     return;
   }
   const tagEl = target.closest('.tag[data-tag]');
   if(tagEl) {
-    const type = tagEl.closest('#tags-asset') ? 'asset' : (tagEl.closest('#tags-liability') ? 'liability' : 'diary');
-    if (type === 'diary') filterDiaryByTag(tagEl.dataset.tag, tagEl); else filterByTag(type, tagEl.dataset.tag, tagEl);
+    const parentTab = tagEl.closest('.tab-content');
+    if (parentTab.id === 'diary-tab') filterDiaryByTag(tagEl.dataset.tag, tagEl);
+    else filterByTag(tagEl.closest('.sub-tab-content').id.includes('asset') ? 'asset' : 'liability', tagEl.dataset.tag, tagEl);
   }
 });
 document.getElementById('search-diary').addEventListener('input', () => debounce('diarySearch', refreshDiary, 300));
-document.querySelectorAll('.record-btn').forEach(btn => btn.addEventListener('click', () => handleRecordButtonClick(btn.dataset.type)));
+['manual-asset', 'manual-liability', 'manual-diary'].forEach(id => document.getElementById(id).addEventListener('focus', () => { isVoice = false; }));
 document.getElementById('download-chart').addEventListener('click', downloadChartImage);
 document.getElementById('help-btn').addEventListener('click', () => openModal('help-modal'));
-document.getElementById('clear-data-btn').addEventListener('click', async () => { if(confirm('This will permanently delete all local data. Are you sure?')) { await dbRequest('entries','readwrite','clear'); await refreshAll(); showToast('All local data cleared.', 'success'); } });
+document.getElementById('clear-data-btn').addEventListener('click', async () => { if(confirm('This will permanently delete all data. Are you sure?')) { await dbRequest('entries','readwrite','clear'); await refreshAll(); showToast('All data cleared.', 'success'); } });
 document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-document.getElementById('google-connect-btn').addEventListener('click', handleGoogleAuthClick);
-document.getElementById('google-disconnect-btn').addEventListener('click', handleGoogleDisconnect);
-
-// Swipe and Keyboard Navigation
+document.querySelectorAll('.modal').forEach(m => { m.addEventListener('click', (e) => { if (e.target === m) closeModal(m); }); m.querySelector('.modal-close').addEventListener('click', () => closeModal(m)); });
+document.getElementById('prev-month').addEventListener('click', () => { currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() - 1, 1); renderCalendar(); });
+document.getElementById('next-month').addEventListener('click', () => { currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + 1, 1); renderCalendar(); });
+document.getElementById('today-btn').addEventListener('click', () => { currentCalendarMonth = new Date(); renderCalendar(); });
+document.getElementById('export-json').addEventListener('click', () => exportData('json'));
+document.getElementById('export-csv').addEventListener('click', () => exportData('csv'));
+document.getElementById('date-format-select').addEventListener('change', (e) => { try { localStorage.setItem('dateFormat', e.target.value); } catch(e) {} refreshAll(); });
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'h') { e.preventDefault(); openModal('help-modal'); }
   if (e.target.matches('.calendar-day[role="button"]') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); showDayEntries(e.target.dataset.date); }
@@ -626,7 +798,10 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') tabs[(currentIndex + 1) % tabs.length].click();
 });
 let touchStartX = 0;
-document.addEventListener('touchstart', (e) => { if (e.target.closest('.entries, .calendar-grid, .chart-container')) return; touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+document.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.entries, .calendar-grid, .chart-container, input, button, select, a')) return;
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
 document.addEventListener('touchend', (e) => {
   if (touchStartX === 0 || document.querySelector('.modal.active')) return;
   const touchEndX = e.changedTouches[0].screenX, diff = touchStartX - touchEndX;
@@ -643,13 +818,80 @@ document.addEventListener('touchend', (e) => {
   }
   touchStartX = 0;
 });
+window.addEventListener('beforeunload', stopRecording);
 
-// Init on Load
+// --- Google API Integration ---
+function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+async function initializeGapiClient() { await gapi.client.init({ apiKey: GOOGLE_API_KEY, discoveryDocs: GOOGLE_DISCOVERY_DOCS }); }
+function gisLoaded() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID, scope: GOOGLE_SCOPES,
+    callback: handleGoogleAuthResponse,
+  });
+}
+function handleGoogleAuthClick() { tokenClient.requestAccessToken({prompt: 'consent'}); }
+async function handleGoogleAuthResponse(res) {
+    if (res.error) { return showToast('Google sign-in failed.', 'error'); }
+    gapi.client.setToken(res);
+    localStorage.setItem('google_auth', JSON.stringify(res));
+    const profile = await gapi.client.people.people.get({ resourceName: 'people/me', personFields: 'names,emailAddresses,photos' });
+    const user = {
+        name: profile.result.names?.[0]?.displayName ?? 'User',
+        email: profile.result.emailAddresses?.[0]?.value,
+        avatar: profile.result.photos?.[0]?.url,
+        joinDate: getLocalDate()
+    };
+    localStorage.setItem('userProfile', JSON.stringify(user));
+    updateUIAfterAuth(user);
+    showToast('Connected to Google!', 'success');
+}
+function updateUIAfterAuth(user) {
+    document.getElementById('google-sign-in-prompt').classList.add('hidden');
+    const profileCard = document.getElementById('user-profile-card');
+    profileCard.classList.remove('hidden');
+    document.getElementById('user-avatar').src = user.avatar || '';
+    document.getElementById('user-name').textContent = user.name;
+    document.getElementById('user-email').textContent = user.email;
+    document.getElementById('user-join-date').textContent = new Date(user.joinDate).toLocaleDateString();
+    document.getElementById('drive-status').classList.replace('disconnected', 'connected');
+    document.getElementById('drive-status').querySelector('span').textContent = 'Connected';
+    document.getElementById('google-connect-btn').classList.add('hidden');
+    document.getElementById('google-disconnect-btn').classList.remove('hidden');
+    ['backup-now-btn', 'restore-data-btn', 'delete-account-btn'].forEach(id => document.getElementById(id).disabled = false);
+    updateProfileStats();
+}
+function handleGoogleDisconnect() {
+    const token = gapi.client.getToken();
+    if (token) google.accounts.oauth2.revoke(token.access_token, () => {});
+    gapi.client.setToken(null);
+    localStorage.removeItem('google_auth');
+    localStorage.removeItem('userProfile');
+    document.getElementById('google-sign-in-prompt').classList.remove('hidden');
+    document.getElementById('user-profile-card').classList.add('hidden');
+    document.getElementById('drive-status').classList.replace('connected', 'disconnected');
+    document.getElementById('drive-status').querySelector('span').textContent = 'Disconnected';
+    document.getElementById('google-connect-btn').classList.remove('hidden');
+    document.getElementById('google-disconnect-btn').classList.add('hidden');
+    ['backup-now-btn', 'restore-data-btn', 'delete-account-btn'].forEach(id => document.getElementById(id).disabled = true);
+    showToast('Disconnected from Google.', 'info');
+}
+async function updateProfileStats() {
+    const entries = await getRawEntries();
+    document.getElementById('stat-total-entries').textContent = entries.length;
+    const netWorth = entries.reduce((acc, e) => {
+        if(e.type === 'asset') return acc + (e.amount || 0);
+        if(e.type === 'liability') return acc - (e.amount || 0);
+        return acc;
+    }, 0);
+    document.getElementById('stat-net-worth').textContent = formatCurrency(netWorth);
+}
+
+// --- Init & Event Listeners ---
 async function init() {
   try {
     await initDB();
-    const savedPeriod = localStorage.getItem('chartPeriod') || 'monthly';
-    document.querySelectorAll('.graph-period-selector .btn').forEach(b => b.classList.toggle('active', b.dataset.period === savedPeriod));
+    document.getElementById('google-connect-btn').addEventListener('click', handleGoogleAuthClick);
+    document.getElementById('google-disconnect-btn').addEventListener('click', handleGoogleDisconnect);
     const userProfile = JSON.parse(localStorage.getItem('userProfile'));
     const googleAuth = JSON.parse(localStorage.getItem('google_auth'));
     if (userProfile && googleAuth) {
@@ -662,10 +904,20 @@ async function init() {
     await refreshAll();
     await checkMissedTasks();
     setInterval(checkMissedTasks, 60 * 1000);
-  } catch (error) { console.error('Initialization failed:', error); showToast('Failed to initialize application.', 'error'); }
+  } catch (error) {
+    console.error('Initialization failed:', error);
+    showToast('Failed to initialize application. Please refresh.', 'error');
+  }
   try { initSpeechRecognition(); } catch (error) { console.warn('Speech recognition not available:', error); }
-  try{ const savedTheme = localStorage.getItem('theme'); applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')); } catch(e) { applyTheme('light'); }
+  try{
+    const savedTheme = localStorage.getItem('theme');
+    const themeToApply = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    applyTheme(themeToApply);
+    document.getElementById('theme-select').value = savedTheme || 'auto';
+  } catch(e) { applyTheme('light'); }
 }
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
-</html>```
+</html>

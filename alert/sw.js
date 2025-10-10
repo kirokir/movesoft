@@ -1,28 +1,664 @@
-const CACHE_NAME = 'alertjar-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  'https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js'
-];
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<!--
+  Alert Jar - Lightweight PWA-style Web App
+  Version: v2.6 (PWA & Initialization Hotfix)
+  Created: 2025-10-10
+  
+  Changes (v2.6):
+  - Fixed critical bug in IndexedDB onupgradeneeded event that caused "Failed to initialize" error.
+  - Re-integrated manifest.json and a functional Service Worker (sw.js) to enable PWA installation prompt.
+  - All other functionalities from the previous stable version (v2.5) are preserved.
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="description" content="A lightweight PWA for personal finance and diary tracking">
+<link rel="manifest" href="manifest.json">
+<title>Alert Jar</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --primary: #2563eb; --primary-dark: #1e40af; --success: #10b981; --danger: #ef4444;
+  --warning: #f59e0b; --info: #3b82f6; --bg: #ffffff; --bg-secondary: #f3f4f6;
+  --text: #1f2937; --text-secondary: #6b7280; --border: #e5e7eb; --shadow: rgba(0, 0, 0, 0.1);
+}
+html[data-theme="dark"] {
+  --primary: #3b82f6; --primary-dark: #2563eb; --bg: #111827; --bg-secondary: #1f2937;
+  --text: #f3f4f6; --text-secondary: #9ca3af; --border: #374151; --shadow: rgba(0, 0, 0, 0.2);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; transition: background-color 0.2s, color 0.2s; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition-duration: 0.01ms !important; } }
+.skip-link { position: absolute; top: -40px; left: 0; background: var(--primary); color: white; padding: 8px; z-index: 9999; transition: top 0.3s; }
+.skip-link:focus { top: 0; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+header { background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px var(--shadow); }
+.header-content { display: flex; justify-content: space-between; align-items: center; padding: 1rem; }
+.header-actions { display: flex; align-items: center; gap: 0.5rem; }
+h1 { font-size: 1.5rem; font-weight: 600; }
+.icon-btn { background: none; border: none; cursor: pointer; padding: 0.5rem; border-radius: 0.375rem; color: var(--text-secondary); }
+.icon-btn:hover { background: var(--bg-secondary); }
+nav { display: flex; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; -ms-overflow-style: none; }
+nav::-webkit-scrollbar { display: none; }
+.tab-btn { flex: 1; min-width: 80px; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; font-size: 0.875rem; color: var(--text-secondary); border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab-btn:hover { background: var(--bg-secondary); } .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-btn svg { width: 20px; height: 20px; }
+main { min-height: calc(100vh - 150px); padding: 1rem 0; }
+.tab-content { display: none; } .tab-content.active { display: block; }
+.sub-tab-nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.sub-tab-btn { padding: 0.5rem 1rem; border: none; background: none; cursor: pointer; font-size: 0.875rem; color: var(--text-secondary); border-bottom: 2px solid transparent; }
+.sub-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+.sub-tab-content { display: none; } .sub-tab-content.active { display: block; }
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 1px 3px var(--shadow); }
+.card h2 { font-size: 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+.record-btn { width: 64px; height: 64px; border-radius: 50%; border: none; background: var(--primary); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 1rem auto; transition: all 0.2s; box-shadow: 0 2px 8px var(--shadow); }
+.record-btn:hover { background: var(--primary-dark); transform: scale(1.05); } .record-btn.recording { background: var(--danger); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+.transcription { min-height: 60px; max-height: 120px; overflow-y: auto; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.375rem; margin: 1rem 0; font-size: 0.875rem; color: var(--text-secondary); }
+.transcription.active { color: var(--text); border: 1px solid var(--primary); }
+.input-group { margin: 1rem 0; }
+input[type="text"], input[type="datetime-local"], textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.375rem; font-size: 0.875rem; font-family: inherit; background-color: var(--bg); color: var(--text); }
+textarea { min-height: 80px; resize: vertical; }
+.btn { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+.btn:disabled { background-color: var(--text-secondary); cursor: not-allowed; opacity: 0.7; }
+.btn-primary { background: var(--primary); color: white; } .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-secondary { background: var(--bg-secondary); color: var(--text); } .btn-secondary:hover { background: var(--border); }
+.btn-danger { background: var(--danger); color: white; } .btn-small { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+.totals { display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
+.total-card { flex: 1; min-width: 120px; padding: 1rem; background: var(--bg-secondary); border-radius: 0.375rem; text-align: center; }
+.total-card .label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+.total-card .amount { font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem; }
+.total-card.asset .amount { color: var(--success); } .total-card.liability .amount { color: var(--danger); }
+.total-filtered-container { visibility: hidden; } .total-filtered-container.active { visibility: visible; }
+.tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+.tag { padding: 0.25rem 0.75rem; background: var(--bg-secondary); border-radius: 1rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--border); transition: all 0.2s; }
+.tag:hover, .tag.active { background: var(--primary); color: white; border-color: var(--primary); }
+.entries { margin-top: 1rem; } .entry { padding: 1rem; border: 1px solid var(--border); border-radius: 0.375rem; margin-bottom: 0.75rem; background: var(--bg); }
+.entry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.entry-time { font-size: 0.75rem; color: var(--text-secondary); }
+.entry-amount { font-size: 1.125rem; font-weight: 600; } .entry-amount.asset { color: var(--success); } .entry-amount.liability { color: var(--danger); }
+.entry-text { margin: 0.5rem 0; font-size: 0.875rem; word-break: break-word; }
+.entry-source { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 0.5rem;}
+.entry-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.todo-item { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.375rem; margin-bottom: 0.5rem; }
+.todo-item.completed { opacity: 0.6; } .todo-item input[type="checkbox"] { margin-top: 0.25rem; width: 18px; height: 18px; cursor: pointer; }
+.todo-content { flex: 1; } .todo-title { font-weight: 500; }
+.todo-due { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; } .todo-due.overdue { color: var(--danger); font-weight: 500; }
+.calendar { margin-top: 1rem; } .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.calendar-nav { display: flex; gap: 0.5rem; } .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; }
+.calendar-day-header { text-align: center; font-size: 0.75rem; font-weight: 600; padding: 0.5rem; color: var(--text-secondary); }
+.calendar-day { aspect-ratio: 1; border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.5rem; cursor: pointer; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.2s; }
+.calendar-day:hover { background: var(--bg-secondary); } .calendar-day.today { border-color: var(--primary); font-weight: 600; } .calendar-day.other-month { opacity: 0.3; cursor: default; }
+.calendar-indicators { display: grid; grid-template-columns: repeat(4, 6px); gap: 2px; margin-top: 0.25rem; max-width: 100%;}
+.calendar-indicator { width: 6px; height: 6px; border-radius: 50%; } .calendar-indicator.asset { background: var(--success); } .calendar-indicator.liability { background: var(--danger); } .calendar-indicator.diary { background: var(--info); } .calendar-indicator.todo { background: var(--warning); }
+.graph-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+.graph-period-selector .btn { margin-right: 0.5rem; } .chart-container { position: relative; height: 60vh; width: 100%; }
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; }
+.modal.active { display: flex; } .modal-content { background: var(--bg); border-radius: 0.5rem; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; position: relative; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0.25rem; color: var(--text-secondary); }
+#toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 2000; display: flex; flex-direction: column; align-items: flex-end;}
+.toast { background: var(--text); color: white; padding: 1rem 1.5rem; border-radius: 0.375rem; box-shadow: 0 4px 12px var(--shadow); display: flex; align-items: center; gap: 0.75rem; animation: slideIn 0.3s, fadeOut 0.3s 4.7s forwards; margin-top: 0.5rem;}
+@keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+.toast.success { background: var(--success); } .toast.error { background: var(--danger); }
+.search-bar { margin-bottom: 1rem; } .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-secondary); }
+.warning-banner { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 1rem; font-size: 0.875rem; }
+html[data-theme="dark"] .warning-banner { background: #373021; color: #fde68a; border-color: #f59e0b; }
+.export-section { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.export-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; } .hidden { display: none !important; }
+#theme-toggle .moon { display: none; } #theme-toggle .sun { display: block; }
+html[data-theme="dark"] #theme-toggle .moon { display: block; } html[data-theme="dark"] #theme-toggle .sun { display: none; }
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<header>
+  <div class="header-content"><h1>Alert Jar <span style="font-size: 0.7rem; font-weight: 400; color: var(--text-secondary); margin-left: 0.5rem;">by <a href="https://dear.is-a.dev" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none; font-weight: 500;">dear&co</a></span></h1><div class="header-actions"><button id="theme-toggle" class="icon-btn" aria-label="Toggle theme"><svg class="sun" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>Light Mode</title><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg><svg class="moon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>Dark Mode</title><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button><button id="help-btn" class="icon-btn" aria-label="Help" title="Help (Ctrl+H)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>Help</title><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button></div></div>
+  <nav role="navigation">
+    <button class="tab-btn active" data-tab="ledger"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Ledger</title><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>Ledger</span></button>
+    <button class="tab-btn" data-tab="diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>Diary</title><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Diary</span></button>
+    <button class="tab-btn" data-tab="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>Calendar</title><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Calendar</span></button>
+    <button class="tab-btn" data-tab="graphs"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Graphs</title><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg><span>Graphs</span></button>
+  </nav>
+</header>
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache');
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
-});
+<main id="main-content" class="container">
+  <div id="ledger-tab" class="tab-content active"><div class="card"><div class="sub-tab-nav" data-parent="ledger"><button class="sub-tab-btn active" data-tab="assets">Assets</button><button class="sub-tab-btn" data-tab="liabilities">Liabilities</button></div><div id="assets-subtab" class="sub-tab-content active"><h2>Assets</h2><div id="speech-warning-asset" class="warning-banner hidden">Speech recognition uses your browser's voice service.</div><button class="record-btn" data-type="asset" aria-label="Record asset"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></button><div id="transcription-asset" class="transcription" role="status" aria-live="polite">Tap microphone to record or type below</div><div class="input-group"><input type="text" id="manual-asset" placeholder="E.g., Client from web dev 69k rupees" aria-label="Manual asset entry"></div><button class="btn btn-primary" data-type="asset" data-action="add">Add Asset</button><div class="totals"><div class="total-card asset"><div class="label">Today</div><div class="amount" id="total-assets-today">₹0</div></div><div class="total-card asset total-filtered-container" id="total-assets-filtered-container"><div class="label">Filtered</div><div class="amount" id="total-assets-filtered">₹0</div></div></div><div id="tags-asset" class="tags"></div><div id="entries-asset" class="entries"></div></div><div id="liabilities-subtab" class="sub-tab-content"><h2>Liabilities</h2><div id="speech-warning-liability" class="warning-banner hidden">Speech recognition uses your browser's voice service.</div><button class="record-btn" data-type="liability" aria-label="Record liability"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></button><div id="transcription-liability" class="transcription" role="status" aria-live="polite">Tap microphone to record or type below</div><div class="input-group"><input type="text" id="manual-liability" placeholder="E.g., Food for friends 700" aria-label="Manual liability entry"></div><button class="btn btn-primary" data-type="liability" data-action="add">Add Liability</button><div class="totals"><div class="total-card liability"><div class="label">Today</div><div class="amount" id="total-liabilities-today">₹0</div></div><div class="total-card liability total-filtered-container" id="total-liabilities-filtered-container"><div class="label">Filtered</div><div class="amount" id="total-liabilities-filtered">₹0</div></div></div><div id="tags-liability" class="tags"></div><div id="entries-liability" class="entries"></div></div></div></div>
+  <div id="diary-tab" class="tab-content"><div class="card"><div class="sub-tab-nav" data-parent="diary"><button class="sub-tab-btn active" data-tab="journal">Journal</button><button class="sub-tab-btn" data-tab="todo">To-Do</button></div><div id="journal-subtab" class="sub-tab-content active"><h2>Journal</h2><div id="speech-warning-diary" class="warning-banner hidden">Speech recognition uses your browser's voice service.</div><button class="record-btn" data-type="diary" aria-label="Record diary entry"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></button><div id="transcription-diary" class="transcription" role="status" aria-live="polite">Tap microphone to record or type below</div><div class="input-group"><textarea id="manual-diary" placeholder="Write your diary entry..." aria-label="Manual diary entry"></textarea></div><button class="btn btn-primary" data-action="add-diary">Save Entry</button><div class="search-bar"><input type="text" id="search-diary" placeholder="Search diary..." aria-label="Search diary"></div><div id="tags-diary" class="tags"></div><div id="entries-diary" class="entries"></div></div><div id="todo-subtab" class="sub-tab-content"><h2>To-Do</h2><div class="input-group"><input type="text" id="todo-title" placeholder="Task title" aria-label="Task title"></div><div class="input-group"><input type="datetime-local" id="todo-due" aria-label="Due date and time"></div><button class="btn btn-primary" data-action="add-todo">Add Task</button><div style="margin-top: 1.5rem;"><h3 style="font-size: 0.875rem; margin-bottom: 0.5rem;">Pending</h3><div id="todos-pending"></div></div><div style="margin-top: 1.5rem;"><h3 style="font-size: 0.875rem; margin-bottom: 0.5rem;">Completed</h3><div id="todos-completed"></div></div><div style="margin-top: 1.5rem;"><h3 style="font-size: 0.875rem; margin-bottom: 0.5rem; color: var(--danger);">Missed</h3><div id="todos-missed"></div></div></div></div></div>
+  <div id="calendar-tab" class="tab-content"><div class="card"><div class="calendar-header"><h2 id="calendar-month"></h2><div class="calendar-nav"><button id="prev-month" class="btn btn-secondary btn-small" aria-label="Previous month">‹</button><button id="today-btn" class="btn btn-secondary btn-small">Today</button><button id="next-month" class="btn btn-secondary btn-small" aria-label="Next month">›</button></div></div><div class="calendar"><div class="calendar-grid" id="calendar-grid"></div></div><div class="export-section"><h3>Export Data</h3><div class="export-buttons"><button id="export-json" class="btn btn-secondary btn-small">Export JSON</button><button id="export-csv" class="btn btn-secondary btn-small">Export CSV</button><label class="btn btn-secondary btn-small" style="cursor: pointer;">Import JSON<input type="file" id="import-json" accept=".json" style="display: none;"></label></div></div></div></div>
+  <div id="graphs-tab" class="tab-content"><div class="card"><h2>Distribution</h2><div class="graph-controls"><div class="graph-period-selector"><button class="btn btn-secondary btn-small" data-period="daily">Daily</button><button class="btn btn-secondary btn-small active" data-period="monthly">Monthly</button><button class="btn btn-secondary btn-small" data-period="yearly">Yearly</button></div><button id="download-chart" class="btn btn-primary btn-small">Download PNG</button></div><div class="chart-container"><canvas id="distribution-chart"></canvas></div></div></div>
+</main>
+<div id="toast-container"></div>
+<div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title"><div class="modal-content"><div class="modal-header"><h2 id="help-modal-title">Help & Privacy</h2><button class="modal-close" aria-label="Close">×</button></div><div><h3>Keyboard Shortcuts</h3><ul style="margin: 1rem 0; line-height: 2;"><li><strong>Arrow Left/Right:</strong> Switch tabs</li><li><strong>Ctrl+H:</strong> Show/hide help</li></ul><h3>Data Management</h3><p style="margin: 1rem 0;"><strong>Data Storage:</strong> All data is stored locally on your device. Nothing is ever sent to a server.</p><button id="clear-data-btn" class="btn btn-danger">Clear All Data</button></div></div></div>
+<div id="day-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="day-modal-title"><div class="modal-content"><div class="modal-header"><h2 id="day-modal-title"></h2><button class="modal-close" aria-label="Close">×</button></div><div id="day-modal-content"></div></div></div>
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Cache hit - return response
-      if (response) {
-        return response;
+<script>
+'use strict';
+// --- App Constants ---
+const APP_VERSION = '2.6';
+
+// --- PWA Service Worker ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => {
+        console.log('Service Worker registered.', reg);
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showToast('New version available! Refresh to update.', 'info', 10000);
+            }
+          });
+        });
+      })
+      .catch(err => {
+        console.error('Service Worker registration failed:', err);
+      });
+  });
+}
+
+// --- Configuration ---
+const CONFIG = {
+  DB_NAME: 'alertjar-db', DB_VERSION: 2,
+  TAG_MAP: ['food', 'rent', 'salary', 'client', 'web dev', 'transport', 'shopping', 'gift', 'health', 'misc', 'paid rent'],
+  STOPWORDS: ['the','a','an','is','to','for','of','with','by','from','i','you','and','or','but','in','on']
+};
+const DEBOUNCE_TIMERS = {};
+
+// --- Database ---
+let db;
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
+    request.onerror = (e) => reject(e.target.error);
+    request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    request.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains('entries')) {
+            const store = database.createObjectStore('entries', { keyPath: 'id' });
+            store.createIndex('timestamp', 'timestamp');
+            store.createIndex('type', 'type');
+        }
+    };
+  });
+}
+async function dbRequest(storeName, mode, action, ...args) {
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(storeName, mode);
+      const request = tx.objectStore(storeName)[action](...args);
+      tx.oncomplete = () => resolve(request.result);
+      tx.onerror = (e) => { if (e.target.error.name === 'QuotaExceededError') showToast('Storage quota exceeded. Please clear some data.', 'error'); reject(e.target.error); };
+    } catch (error) { reject(error); }
+  });
+}
+const saveEntry = (entry) => dbRequest('entries', 'readwrite', 'put', entry);
+const getRawEntries = () => dbRequest('entries', 'readonly', 'getAll');
+const deleteEntry = (id) => dbRequest('entries', 'readwrite', 'delete', id);
+async function getEntries(filters = {}) {
+  let entries = await getRawEntries();
+  if (filters.type) entries = entries.filter(e => e.type === filters.type);
+  if (filters.types) entries = entries.filter(e => filters.types.includes(e.type));
+  if (filters.date) entries = entries.filter(e => e.date === filters.date);
+  if (filters.tags?.length > 0) entries = entries.filter(e => e.tags?.some(tag => filters.tags.includes(tag)));
+  if (filters.search) {
+    const search = filters.search.toLowerCase();
+    entries = entries.filter(e => e.text.toLowerCase().includes(search) || e.tags?.some(tag => tag.includes(search)));
+  }
+  return entries.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+// --- Utility Functions ---
+const uuid = () => (self.crypto?.randomUUID ? self.crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
+const formatCurrency = (amount) => new Intl.NumberFormat(navigator.language || 'en-IN', { style: 'currency', currency: 'INR' }).format(amount ?? 0);
+const getLocalDate = (date = new Date()) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+const formatDateTime = (timestamp) => new Date(timestamp).toLocaleString(navigator.language || 'en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const sanitize = (str) => { const div = document.createElement('div'); div.textContent = String(str); return div.innerHTML; };
+
+function parseAmount(text) {
+  const cleaned = text.replace(/,/g, ''); const match = cleaned.match(/[-]?\s*\d+(\.\d+)?k?/i);
+  if (!match) return null; let num = parseFloat(match[0].replace(/\s/g, ''));
+  if (match[0].toLowerCase().includes('k')) num *= 1000; return num;
+}
+function extractTags(text) {
+  const lower = text.toLowerCase(), tags = new Set();
+  CONFIG.TAG_MAP.forEach(tag => { if (lower.includes(tag)) tags.add(tag); });
+  const fromMatch = lower.match(/(?:from|for)\s+([\w\s]+?)(?:\s+\d|$)/i);
+  if (fromMatch) tags.add(fromMatch[1].trim());
+  lower.split(/\s+/).forEach(word => { if (word.length >= 4 && !CONFIG.STOPWORDS.includes(word) && isNaN(word)) tags.add(word); });
+  return Array.from(tags).slice(0, 5);
+}
+function showToast(message, type = 'info', duration = 5000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.setAttribute('role', 'status'); toast.setAttribute('aria-live', 'polite');
+  toast.textContent = message;
+  container.prepend(toast);
+  setTimeout(() => toast.remove(), duration);
+}
+
+// --- Speech Recognition ---
+let recognition, recognitionIsActive = false, currentRecognitionType = null, isVoice = false, finalTranscriptBuffer = '';
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { console.warn('Speech Recognition not supported.'); return; }
+  recognition = new SpeechRecognition();
+  recognition.continuous = true; recognition.interimResults = true; recognition.lang = navigator.language || 'en-IN';
+
+  recognition.onresult = (event) => {
+    let interimTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) finalTranscriptBuffer += event.results[i][0].transcript + ' ';
+      else interimTranscript += event.results[i][0].transcript;
+    }
+    const manualInputEl = document.getElementById(`manual-${currentRecognitionType}`);
+    manualInputEl.value = finalTranscriptBuffer + interimTranscript;
+    document.getElementById(`transcription-${currentRecognitionType}`).textContent = manualInputEl.value || 'Listening...';
+    isVoice = true;
+  };
+  recognition.onerror = (e) => { showToast(`Speech error: ${e.error}`, 'error'); stopRecording(); };
+  recognition.onend = () => { if (recognitionIsActive && recognition) setTimeout(() => { try { recognition.start(); } catch (e) { stopRecording(); showToast('Speech recognition failed to restart', 'error'); } }, 100); else stopRecordingCleanupUI(); };
+}
+function handleRecordButtonClick(type) { if (recognitionIsActive) stopRecording(); else startRecording(type); }
+function startRecording(type) {
+  if (!recognition) { showToast('Speech recognition not available.', 'error'); return; }
+  currentRecognitionType = type; recognitionIsActive = true;
+  document.getElementById(`speech-warning-${type}`).classList.remove('hidden');
+  document.querySelector(`.record-btn[data-type="${type}"]`).classList.add('recording');
+  document.getElementById(`transcription-${type}`).classList.add('active');
+  try { recognition.start(); } catch (e) { stopRecording(); showToast('Failed to start recording.', 'error'); }
+}
+function stopRecording() {
+  if (!recognitionIsActive) return;
+  recognitionIsActive = false; if (recognition) try { recognition.stop(); } catch(e) {}
+  stopRecordingCleanupUI();
+}
+function stopRecordingCleanupUI() {
+  if (currentRecognitionType) document.querySelector(`.record-btn[data-type="${currentRecognitionType}"]`)?.classList.remove('recording');
+  finalTranscriptBuffer = ''; currentRecognitionType = null;
+}
+
+// --- Entry Management ---
+let refreshInProgress = false;
+async function addEntry(type, text, btnEl) {
+  if (!text.trim()) { showToast('Please enter some text', 'error'); return; }
+  const amount = parseAmount(text);
+  if ((type === 'asset' || type === 'liability') && (!amount || amount <= 0)) { showToast('Amount must be a positive number.', 'error'); return; }
+  btnEl.disabled = true; btnEl.textContent = 'Saving...';
+  const entry = { id: uuid(), type, date: getLocalDate(), timestamp: Date.now(), text, amount, tags: extractTags(text), source: isVoice ? 'voice' : 'manual' };
+  try {
+    await saveEntry(entry); showToast('Entry saved!', 'success');
+    document.getElementById(`manual-${type}`).value = '';
+    isVoice = false; await refreshAll();
+  } catch (error) { showToast('Failed to save entry.', 'error'); }
+  finally {
+    btnEl.disabled = false; btnEl.textContent = `Add ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    const transcriptionEl = document.getElementById(`transcription-${type}`);
+    transcriptionEl.classList.remove('active'); transcriptionEl.textContent = 'Tap microphone to record or type below';
+  }
+}
+async function refreshEntries(type) {
+  const entries = await getEntries({ type });
+  const todayEntries = entries.filter(e => e.date === getLocalDate());
+  document.getElementById(`total-${type}s-today`).textContent = formatCurrency(todayEntries.reduce((s, e) => s + (e.amount ?? 0), 0));
+  renderTags(type, Array.from(new Set(entries.flatMap(e => e.tags || []))));
+  renderEntries(type, entries);
+}
+function renderTags(type, tags) {
+    const container = document.getElementById(`tags-${type}`), fragment = document.createDocumentFragment();
+    tags.forEach(tag => { const btn = document.createElement('button'); btn.className='tag'; btn.textContent=tag; btn.dataset.tag=tag; fragment.appendChild(btn); });
+    container.innerHTML = ''; container.appendChild(fragment);
+}
+async function filterByTag(type, tag, btnEl) {
+  const isActive = btnEl.classList.toggle('active');
+  document.querySelectorAll(`#tags-${type} .tag`).forEach(b => { if(b !== btnEl) b.classList.remove('active'); });
+  document.getElementById(`total-${type}s-filtered-container`).classList.toggle('active', isActive);
+  const entries = await getEntries({ type, tags: isActive ? [tag] : [] });
+  if (isActive) document.getElementById(`total-${type}s-filtered`).textContent = formatCurrency(entries.reduce((s, e) => s + (e.amount ?? 0), 0));
+  renderEntries(type, isActive ? entries : await getEntries({type}));
+}
+function renderEntries(type, entries) {
+  document.getElementById(`entries-${type}`).innerHTML = entries.length === 0 ? `<div class="empty-state"><p>No entries yet</p></div>` : entries.map(entry => `
+    <div class="entry" data-id="${entry.id}"><div class="entry-header"><div class="entry-time">${formatDateTime(entry.timestamp)}</div>${entry.amount != null ? `<div class="entry-amount ${type}">${formatCurrency(entry.amount)}</div>` : ''}</div><div class="entry-text">${sanitize(entry.text)}</div><div class="entry-source">${entry.source}</div>${entry.tags?.length ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${sanitize(tag)}</span>`).join('')}</div>` : ''}<div class="entry-actions"><button class="btn btn-danger btn-small" data-action="delete">Delete</button></div></div>`).join('');
+}
+
+// --- Diary & To-Do ---
+let activeDiaryTag = null;
+async function addDiaryEntry(text, btnEl) {
+  if (!text.trim()) { showToast('Please enter some text', 'error'); return; }
+  btnEl.disabled = true; btnEl.textContent = 'Saving...';
+  const entry = { id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text, tags: extractTags(text), source: isVoice ? 'voice' : 'manual' };
+  try { await saveEntry(entry); showToast('Diary entry saved!', 'success'); document.getElementById('manual-diary').value = ''; isVoice = false; await refreshAll(); }
+  catch (error) { showToast('Failed to save diary entry.', 'error'); }
+  finally { btnEl.disabled = false; btnEl.textContent = 'Save Entry'; const transcriptionEl = document.getElementById(`transcription-diary`); transcriptionEl.classList.remove('active'); transcriptionEl.textContent = 'Tap microphone to record or type below';}
+}
+async function refreshDiary() {
+  const searchVal = document.getElementById('search-diary').value;
+  const entries = await getEntries({ type: 'diary', search: searchVal, tags: activeDiaryTag ? [activeDiaryTag] : [] });
+  renderDiaryTags(Array.from(new Set((await getEntries({type: 'diary'})).flatMap(e => e.tags || []))));
+  renderDiaryEntries(entries);
+}
+function renderDiaryTags(tags) { renderTags('diary', tags); }
+async function filterDiaryByTag(tag, btnEl) {
+  const isActive = btnEl.classList.toggle('active'); activeDiaryTag = isActive ? tag : null;
+  document.querySelectorAll('#tags-diary .tag').forEach(b => { if (b !== btnEl) b.classList.remove('active'); });
+  await refreshDiary();
+}
+function renderDiaryEntries(entries) {
+  document.getElementById('entries-diary').innerHTML = entries.length === 0 ? `<div class="empty-state"><p>No diary entries yet</p></div>` : entries.map(entry => `
+    <div class="entry" data-id="${entry.id}"><div class="entry-header"><div class="entry-time">${formatDateTime(entry.timestamp)}</div></div><div class="entry-text">${sanitize(entry.text)}</div>${entry.tags?.length ? `<div class="tags">${entry.tags.map(tag => `<span class="tag">${sanitize(tag)}</span>`).join('')}</div>` : ''}<div class="entry-actions"><button class="btn btn-danger btn-small" data-action="delete">Delete</button></div></div>`).join('');
+}
+async function addTodo() {
+  const title = document.getElementById('todo-title').value.trim(), due = document.getElementById('todo-due').value;
+  if (!title) { showToast('Please enter a task title', 'error'); return; }
+  if (due && !validateTodoDate(due)) { showToast('Due date cannot be in the past.', 'error'); return; }
+  const entry = { id: uuid(), type: 'todo', date: getLocalDate(), timestamp: Date.now(), text: title, todoMeta: { status: 'pending', due } };
+  try { await saveEntry(entry); showToast('Task added!', 'success'); document.getElementById('todo-title').value = ''; document.getElementById('todo-due').value = ''; await refreshAll(); }
+  catch (error) { showToast('Failed to add task.', 'error'); }
+}
+async function toggleTodo(id, checked) {
+  try {
+    const todo = (await getEntries({ type: 'todo' })).find(e => e.id === id); if (!todo) return;
+    const newStatus = checked ? 'done' : 'pending';
+    await saveEntry({ ...todo, todoMeta: { ...todo.todoMeta, status: newStatus } });
+    if (checked) { await saveEntry({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Completed task: ${todo.text}`, tags: ['todo-done'], source: 'todo-auto' }); showToast('Task completed!', 'success'); }
+    await refreshAll();
+  } catch (error) { showToast('Failed to update task.', 'error'); }
+}
+async function checkMissedTasks() {
+  const now = Date.now(); let updated = false;
+  for (const todo of await getEntries({ type: 'todo' })) {
+    if (todo.todoMeta.status === 'pending') {
+      const dueTime = todo.todoMeta.due ? new Date(todo.todoMeta.due).getTime() : null;
+      if (dueTime && dueTime < now) {
+        await saveEntry({ ...todo, todoMeta: { ...todo.todoMeta, status: 'missed' } });
+        await saveEntry({ id: uuid(), type: 'diary', date: getLocalDate(), timestamp: Date.now(), text: `Missed task: ${todo.text}`, tags: ['todo-missed'], source: 'todo-auto' });
+        updated = true;
       }
-      // Not in cache - fetch from network
-      return fetch(event.request);
-    })
-  );
+    }
+  }
+  if (updated) await refreshAll();
+}
+async function refreshTodos() {
+  const todos = await getEntries({ type: 'todo' });
+  renderTodos('pending', todos.filter(e => e.todoMeta.status === 'pending'));
+  renderTodos('completed', todos.filter(e => e.todoMeta.status === 'done'));
+  renderTodos('missed', todos.filter(e => e.todoMeta.status === 'missed'));
+}
+function renderTodos(status, todos) {
+  const container = document.getElementById(`todos-${status}`);
+  if (todos.length === 0) { container.innerHTML = '<p style="color: var(--text-secondary);">None</p>'; return; }
+  container.innerHTML = todos.map(todo => {
+    const dueDate = todo.todoMeta.due ? new Date(todo.todoMeta.due) : null;
+    const isOverdue = dueDate && dueDate < new Date() && status === 'pending';
+    return `<div class="todo-item ${status !== 'pending' ? 'completed' : ''}" data-id="${todo.id}"><input type="checkbox" data-action="toggle-todo" ${status === 'completed' ? 'checked' : ''} ${status === 'missed' ? 'disabled' : ''}><div class="todo-content"><div class="todo-title">${sanitize(todo.text)}</div>${dueDate ? `<div class="todo-due ${isOverdue ? 'overdue' : ''}">Due: ${dueDate.toLocaleString()}</div>` : ''}</div><button class="btn btn-danger btn-small" data-action="delete">×</button></div>`;
+  }).join('');
+}
+const validateTodoDate = (due) => { const now = new Date(), dueDate = new Date(due); return new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()) >= new Date(now.getFullYear(), now.getMonth(), now.getDate()); };
+
+// --- Calendar ---
+let currentCalendarMonth = new Date();
+async function renderCalendar() {
+  const year = currentCalendarMonth.getFullYear(), month = currentCalendarMonth.getMonth();
+  document.getElementById('calendar-month').textContent = currentCalendarMonth.toLocaleDateString(navigator.language || 'en-IN', { month: 'long', year: 'numeric' });
+  const entriesByDate = (await getRawEntries()).reduce((acc, e) => {
+    acc[e.date] = acc[e.date] || { a:0,l:0,d:0,t:0 };
+    if(e.type==='asset')acc[e.date].a++; else if(e.type==='liability')acc[e.date].l++; else if(e.type==='diary')acc[e.date].d++; else if(e.type==='todo')acc[e.date].t++;
+    return acc;
+  }, {});
+  const grid = document.getElementById('calendar-grid');
+  grid.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(day => `<div class="calendar-day-header">${day}</div>`).join('');
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for (let i = 1; i <= totalCells; i++) {
+    const dayNum = i - firstDay;
+    if (dayNum > 0 && dayNum <= daysInMonth) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      const indicatorsData = entriesByDate[dateStr];
+      const indicators = indicatorsData ? Object.entries(indicatorsData).map(([k, v]) => v > 0 ? `<div class="calendar-indicator ${{'a':'asset','l':'liability','d':'diary','t':'todo'}[k]}"></div>` : '').join('') : '';
+      const dayLabel = new Date(dateStr + 'T00:00:00Z').toLocaleDateString(navigator.language || 'en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      grid.insertAdjacentHTML('beforeend', `<div role="button" tabindex="0" class="calendar-day ${dateStr === getLocalDate() ? 'today' : ''}" data-date="${dateStr}" aria-label="${dayLabel}">${dayNum}${indicators ? `<div class="calendar-indicators">${indicators}</div>` : ''}</div>`);
+    } else {
+      grid.insertAdjacentHTML('beforeend', `<div class="calendar-day other-month"></div>`);
+    }
+  }
+}
+async function showDayEntries(date) {
+  const dateObj = new Date(date + 'T00:00:00Z');
+  openModal('day-modal', (modal) => {
+    modal.querySelector('#day-modal-title').textContent = dateObj.toLocaleDateString(navigator.language || 'en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    getEntries({ date }).then(entries => {
+      modal.querySelector('#day-modal-content').innerHTML = entries.length === 0 ? '<p>No entries for this day.</p>' : entries.map(entry => `
+      <div class="entry"><div class="entry-header"><div class="entry-time">${formatDateTime(entry.timestamp)} (${entry.type})</div>${entry.amount != null ? `<div class="entry-amount ${entry.type}">${formatCurrency(entry.amount)}</div>` : ''}</div><div class="entry-text">${sanitize(entry.text)}</div></div>`).join('');
+    });
+  });
+}
+
+// --- Graphs ---
+let chartInstance;
+async function renderDistributionGraph() {
+  const period = localStorage.getItem('chartPeriod') || 'monthly';
+  const entries = await getEntries({ types: ['asset', 'liability'] });
+  const data = { asset: {}, liability: {} }, labels = new Set();
+  const today = new Date(); const thirtyDaysAgo = new Date(new Date().setDate(today.getDate() - 30));
+  entries.forEach(entry => {
+    if (entry.amount == null) return;
+    const date = new Date(entry.timestamp); let key;
+    if (period === 'daily') { if (date < thirtyDaysAgo) return; key = date.toISOString().split('T')[0]; }
+    else if (period === 'monthly') key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    else { if(date.getFullYear() < today.getFullYear() - 5) return; key = date.getFullYear().toString(); }
+    labels.add(key); data[entry.type][key] = (data[entry.type][key] || 0) + entry.amount;
+  });
+  const sortedLabels = Array.from(labels).sort();
+  const style = getComputedStyle(document.documentElement);
+  const chartData = {
+    labels: sortedLabels,
+    datasets: [ { label: 'Assets', data: sortedLabels.map(l => data.asset[l] || 0), backgroundColor: style.getPropertyValue('--success') }, { label: 'Liabilities', data: sortedLabels.map(l => data.liability[l] || 0), backgroundColor: style.getPropertyValue('--danger') } ]
+  };
+  const chartOptions = { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { color: style.getPropertyValue('--text-secondary') } }, x: { ticks: { color: style.getPropertyValue('--text-secondary') } } }, plugins: { legend: { labels: { color: style.getPropertyValue('--text-secondary') } } } };
+  const canvas = document.getElementById('distribution-chart');
+  if (chartInstance && typeof chartInstance.destroy === 'function') chartInstance.destroy();
+  chartInstance = new Chart(canvas.getContext('2d'), { type: 'bar', data: chartData, options: chartOptions });
+}
+async function downloadChartImage() {
+  if (!chartInstance) { showToast('No chart to download.', 'error'); return; }
+  const canvas = document.getElementById('distribution-chart'), period = localStorage.getItem('chartPeriod') || 'monthly';
+  const entries = await getEntries({ types: ['asset', 'liability'] });
+  const totalAssets=entries.filter(e=>e.type==='asset').reduce((s,e)=>s+(e.amount||0),0), totalLiabilities=entries.filter(e=>e.type==='liability').reduce((s,e)=>s+(e.amount||0),0), netPosition=totalAssets-totalLiabilities;
+  const scale=2, width=1200, height=800; const exportCanvas=document.createElement('canvas'); exportCanvas.width=width*scale; exportCanvas.height=height*scale;
+  const ctx = exportCanvas.getContext('2d'); ctx.scale(scale, scale);
+  const style = getComputedStyle(document.documentElement); const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  ctx.fillStyle = isDark ? style.getPropertyValue('--bg').trim() : '#ffffff'; ctx.fillRect(0,0,width,height);
+  ctx.fillStyle = isDark ? style.getPropertyValue('--text').trim() : '#1f2937'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('Alert Jar - Financial Distribution', 40, 50);
+  ctx.font = '16px sans-serif'; ctx.fillStyle = isDark ? style.getPropertyValue('--text-secondary').trim() : '#6b7280'; ctx.fillText(`${period.charAt(0).toUpperCase() + period.slice(1)} View • ${new Date().toLocaleDateString(navigator.language || 'en-IN')}`, 40, 75);
+  const boxY=100, boxHeight=80, boxWidth=(width-120)/3;
+  const drawBox = (x, bg, color, val, label) => { ctx.fillStyle=bg;ctx.fillRect(x,boxY,boxWidth,boxHeight);ctx.fillStyle=color;ctx.font='bold 24px sans-serif';ctx.fillText(formatCurrency(val),x+20,boxY+35);ctx.font='14px sans-serif';ctx.fillText(label,x+20,boxY+60); };
+  drawBox(40, isDark?'#064e3b':'#ecfdf5', isDark?'#6ee7b7':'#059669', totalAssets, 'Total Assets');
+  drawBox(40 + boxWidth + 20, isDark?'#7f1d1d':'#fef2f2', isDark?'#fca5a5':'#dc2626', totalLiabilities, 'Total Liabilities');
+  drawBox(40 + 2 * (boxWidth + 20), netPosition >= 0 ? (isDark?'#064e3b':'#ecfdf5') : (isDark?'#7f1d1d':'#fef2f2'), netPosition >= 0 ? (isDark?'#6ee7b7':'#059669') : (isDark?'#fca5a5':'#dc2626'), netPosition, 'Net Position');
+  ctx.drawImage(canvas, 40, boxY + boxHeight + 30, width - 80, height - (boxY + boxHeight + 30) - 80);
+  ctx.fillStyle = isDark ? style.getPropertyValue('--text-secondary').trim() : '#9ca3af'; ctx.font = '14px sans-serif'; ctx.fillText('Generated by dear&co (dear.is-a.dev)', 40, height - 40);
+  exportCanvas.toBlob((blob) => { downloadBlob(blob, `alertjar-${period}-${getLocalDate()}.png`); }, 'image/png', 1.0);
+}
+
+// --- Export/Import ---
+const formatCsvField = (data) => { const string = String(data ?? ''); return (/[",\n]/.test(string)) ? `"${string.replace(/"/g, '""')}"` : string; };
+async function exportData(format) {
+  const entries = await getRawEntries();
+  if(entries.length === 0) { showToast('No data to export.', 'info'); return; }
+  const date = getLocalDate();
+  const metadata = { exportDate: new Date().toISOString(), appName: 'Alert Jar', appVersion: APP_VERSION, exportedBy: 'dear&co', website: 'https://dear.is-a.dev', totalEntries: entries.length };
+  if (format === 'json') {
+    downloadBlob(new Blob([JSON.stringify({ metadata, entries }, null, 2)], { type: 'application/json' }), `alertjar-export-${date}.json`);
+  } else if (format === 'csv') {
+    const assetTotal=entries.filter(e=>e.type==='asset').reduce((s,e)=>s+(e.amount||0),0), liabilityTotal=entries.filter(e=>e.type==='liability').reduce((s,e)=>s+(e.amount||0),0);
+    const lines = [`# Alert Jar Export - by dear&co`, `# Generated: ${new Date().toLocaleString()}`, `# Total Entries: ${entries.length}`, `# Net Position: ${formatCurrency(assetTotal - liabilityTotal)}`, '', ['ID','Type','Timestamp (ISO)','Text','Amount','Tags','Source','Todo Status','Todo Due'].join(',')];
+    [...entries].sort((a, b) => b.timestamp - a.timestamp).forEach(e => lines.push([e.id,e.type,new Date(e.timestamp).toISOString(),e.text,e.amount??'',e.tags?.join(';'),e.source,e.todoMeta?.status,e.todoMeta?.due].map(formatCsvField).join(',')));
+    downloadBlob(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' }), `alertjar-export-${date}.csv`);
+  }
+  showToast(`Exported ${entries.length} entries as ${format.toUpperCase()}`, 'success');
+}
+function downloadBlob(blob, filename) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
+const validateImportedData = (entries) => Array.isArray(entries) && entries.every(e => ['id','type','date','timestamp','text'].every(f=>f in e) && typeof e.id==='string'&&/^[0-9a-f-]{36}$/i.test(e.id) && ['asset','liability','diary','todo'].includes(e.type) && /^\d{4}-\d{2}-\d{2}$/.test(e.date) && typeof e.timestamp==='number' && typeof e.text==='string');
+document.getElementById('import-json').onchange = (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    try {
+      const data = JSON.parse(event.target.result);
+      const entries = data.metadata?.entries ?? (Array.isArray(data) ? data : null);
+      if (!validateImportedData(entries)) throw new Error("Invalid format");
+      if(!confirm(`Import ${entries.length} entries? This will overwrite existing data.`)) return;
+      currentCalendarMonth = new Date();
+      const tx = db.transaction(['entries'], 'readwrite');
+      entries.forEach(entry => tx.objectStore('entries').put(entry));
+      tx.oncomplete = () => { showToast(`Imported ${entries.length} entries`, 'success'); refreshAll(); };
+      tx.onerror = () => showToast('Import failed.', 'error');
+    } catch (error) { showToast('Invalid or corrupt JSON file.', 'error'); console.error(error); }
+  };
+  reader.readAsText(file); e.target.value = '';
+};
+
+// --- Theme & Modal Management ---
+const applyTheme = (theme) => {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('theme', theme); } catch(e) { console.warn('Could not save theme to localStorage.'); }
+  if(document.getElementById('graphs-tab').classList.contains('active')) renderDistributionGraph();
+};
+const toggleTheme = () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+let lastFocusedElement;
+function openModal(modalId, setupFn) {
+  const modal = document.getElementById(modalId);
+  lastFocusedElement = document.activeElement; if(setupFn) setupFn(modal);
+  modal.classList.add('active'); modal.querySelector('button, a, input').focus();
+  modal.addEventListener('keydown', trapFocus);
+}
+function closeModal(modal) {
+  modal.classList.remove('active'); modal.removeEventListener('keydown', trapFocus);
+  if(lastFocusedElement) lastFocusedElement.focus();
+}
+function trapFocus(e) {
+  if (e.key === 'Escape') { closeModal(e.currentTarget); return; }
+  if (e.key === 'Tab') {
+    const focusable = Array.from(e.currentTarget.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null);
+    if(focusable.length === 0) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+  }
+}
+
+// --- Event Listeners & Init ---
+const debounce = (id, func, wait) => { clearTimeout(DEBOUNCE_TIMERS[id]); DEBOUNCE_TIMERS[id] = setTimeout(func, wait); };
+const refreshAll = async () => {
+  if (refreshInProgress) return; refreshInProgress = true;
+  try {
+    await Promise.allSettled([refreshEntries('asset'), refreshEntries('liability'), refreshDiary(), refreshTodos(), renderCalendar()]);
+    if (document.getElementById('graphs-tab').classList.contains('active')) await renderDistributionGraph();
+  } finally { refreshInProgress = false; }
+};
+document.addEventListener('click', (e) => {
+  const target = e.target, actionTarget = target.closest('[data-action]');
+  const tabBtn = target.closest('.tab-btn');
+  if (tabBtn) {
+    document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
+    tabBtn.classList.add('active'); document.getElementById(`${tabBtn.dataset.tab}-tab`).classList.add('active');
+    if (recognitionIsActive) stopRecording(); Object.keys(DEBOUNCE_TIMERS).forEach(key => clearTimeout(DEBOUNCE_TIMERS[key]));
+    document.querySelectorAll('.tag.active').forEach(t => t.classList.remove('active')); activeDiaryTag = null;
+    document.querySelectorAll('.total-filtered-container').forEach(c => c.classList.remove('active'));
+    if (tabBtn.dataset.tab === 'diary') document.getElementById('search-diary').value = '';
+    if (tabBtn.dataset.tab === 'graphs') renderDistributionGraph();
+    return;
+  }
+  const subTabBtn = target.closest('.sub-tab-btn');
+  if (subTabBtn) {
+    const parent = subTabBtn.closest('.sub-tab-nav').dataset.parent;
+    document.querySelectorAll(`#${parent}-tab .sub-tab-btn, #${parent}-tab .sub-tab-content`).forEach(el => el.classList.remove('active'));
+    subTabBtn.classList.add('active'); document.getElementById(`${subTabBtn.dataset.tab}-subtab`).classList.add('active');
+    return;
+  }
+  const periodBtn = target.closest('.graph-period-selector .btn');
+  if (periodBtn) { try{localStorage.setItem('chartPeriod', periodBtn.dataset.period);}catch(e){} document.querySelectorAll('.graph-period-selector .btn').forEach(b => b.classList.remove('active')); periodBtn.classList.add('active'); renderDistributionGraph(); return; }
+  const calendarDay = target.closest('.calendar-day[role="button"]');
+  if (calendarDay) { showDayEntries(calendarDay.dataset.date); return; }
+  if (actionTarget) {
+    const action = actionTarget.dataset.action;
+    if(action === 'add') addEntry(actionTarget.dataset.type, document.getElementById(`manual-${actionTarget.dataset.type}`).value, actionTarget);
+    else if(action === 'add-diary') addDiaryEntry(document.getElementById('manual-diary').value, actionTarget);
+    else if(action === 'add-todo') addTodo();
+    const entryEl = actionTarget.closest('[data-id]');
+    if (entryEl) {
+      if(action === 'delete' && confirm('Are you sure you want to delete this entry?')) deleteEntry(entryEl.dataset.id).then(() => { showToast('Entry deleted', 'success'); refreshAll(); }).catch(() => showToast('Failed to delete', 'error'));
+      else if(action === 'toggle-todo') toggleTodo(entryEl.dataset.id, actionTarget.checked);
+    }
+    return;
+  }
+  const tagEl = target.closest('.tag[data-tag]');
+  if(tagEl) {
+    const type = tagEl.closest('#tags-asset') ? 'asset' : (tagEl.closest('#tags-liability') ? 'liability' : 'diary');
+    if (type === 'diary') filterDiaryByTag(tagEl.dataset.tag, tagEl); else filterByTag(type, tagEl.dataset.tag, tagEl);
+  }
 });
+document.getElementById('search-diary').addEventListener('input', () => debounce('diarySearch', refreshDiary, 300));
+['manual-asset', 'manual-liability', 'manual-diary'].forEach(id => document.getElementById(id).addEventListener('focus', () => { isVoice = false; }));
+document.getElementById('download-chart').addEventListener('click', downloadChartImage);
+document.getElementById('help-btn').addEventListener('click', () => openModal('help-modal'));
+document.getElementById('clear-data-btn').addEventListener('click', async () => { if(confirm('This will permanently delete all data. Are you sure?')) { await dbRequest('entries','readwrite','clear'); await refreshAll(); showToast('All data cleared.', 'success'); } });
+document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+document.querySelectorAll('.modal').forEach(m => { m.addEventListener('click', (e) => { if (e.target === m) closeModal(m); }); m.querySelector('.modal-close').addEventListener('click', () => closeModal(m)); });
+document.getElementById('prev-month').addEventListener('click', () => { currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() - 1, 1); renderCalendar(); });
+document.getElementById('next-month').addEventListener('click', () => { currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + 1, 1); renderCalendar(); });
+document.getElementById('today-btn').addEventListener('click', () => { currentCalendarMonth = new Date(); renderCalendar(); });
+document.getElementById('export-json').addEventListener('click', () => exportData('json'));
+document.getElementById('export-csv').addEventListener('click', () => exportData('csv'));
+document.getElementById('todo-due').addEventListener('focus', (e) => { e.target.min = new Date().toISOString().slice(0, 16); });
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'h') { e.preventDefault(); openModal('help-modal'); }
+  if (e.target.matches('.calendar-day[role="button"]') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); showDayEntries(e.target.dataset.date); }
+  if (e.target.matches('input, textarea, [contenteditable]')) return;
+  const tabs = [...document.querySelectorAll('.tab-btn')], currentIndex = tabs.findIndex(tab => tab.classList.contains('active'));
+  if (e.key === 'ArrowLeft') tabs[(currentIndex - 1 + tabs.length) % tabs.length].click();
+  else if (e.key === 'ArrowRight') tabs[(currentIndex + 1) % tabs.length].click();
+});
+let touchStartX = 0;
+document.addEventListener('touchstart', (e) => { if (e.target.closest('.entries, .calendar-grid, .chart-container')) return; touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (touchStartX === 0 || document.querySelector('.modal.active')) return;
+  const touchEndX = e.changedTouches[0].screenX, diff = touchStartX - touchEndX;
+  if (Math.abs(diff) < 50) return;
+  const activeSubNav = document.querySelector('.tab-content.active .sub-tab-nav');
+  if (activeSubNav) {
+    const subTabs = [...activeSubNav.querySelectorAll('.sub-tab-btn')], currentSubIndex = subTabs.findIndex(t => t.classList.contains('active'));
+    if (diff > 0 && currentSubIndex < subTabs.length - 1) subTabs[currentSubIndex + 1].click();
+    else if (diff < 0 && currentSubIndex > 0) subTabs[currentSubIndex - 1].click();
+  } else {
+    const tabs = [...document.querySelectorAll('.tab-btn')], currentIndex = tabs.findIndex(tab => tab.classList.contains('active'));
+    if (diff > 0 && currentIndex < tabs.length - 1) tabs[currentIndex + 1].click();
+    else if (diff < 0 && currentIndex > 0) tabs[currentIndex - 1].click();
+  }
+  touchStartX = 0;
+});
+window.addEventListener('beforeunload', stopRecording);
+
+// --- Initial Load ---
+async function init() {
+  try {
+    await initDB();
+    const savedPeriod = localStorage.getItem('chartPeriod') || 'monthly';
+    document.querySelectorAll('.graph-period-selector .btn').forEach(b => b.classList.toggle('active', b.dataset.period === savedPeriod));
+    await refreshAll();
+    await checkMissedTasks();
+    setInterval(checkMissedTasks, 5 * 60 * 1000);
+  } catch (error) { console.error('Initialization failed:', error); showToast('Failed to initialize application.', 'error'); }
+  try { initSpeechRecognition(); } catch (error) { console.warn('Speech recognition not available:', error); }
+  try{ const savedTheme = localStorage.getItem('theme'); applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')); } catch(e) { applyTheme('light'); }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+</script>
+</body>
+</html>

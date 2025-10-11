@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Physio-Mimica Pro - BlazePose Shoulder Analysis</title>
+    <title>Physio-Mimica Pro - Shoulder Analysis</title>
     
     <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
@@ -13,170 +13,160 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     
     <style>
+        /* --- Base and Layout --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #A2B2EE 0%, #6A6AFF 100%);
             color: #333;
+            overflow: hidden;
+        }
+
+        .app-container {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 10px;
+            padding: 20px;
+            gap: 15px;
+            height: 100%;
         }
-        
-        .container { max-width: 1600px; width: 100%; }
-        
-        .header {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 10px 20px;
-            margin-bottom: 10px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.1);
-        }
-        
-        .header h1 { color: #667eea; font-size: 1.5rem; margin: 0; }
-        
-        .main-grid {
+
+        .main-content {
+            flex-grow: 1;
             display: grid;
             grid-template-columns: 3fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 15px;
+            min-height: 0;
         }
         
-        .video-section {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.1);
+        /* --- Panel Styling --- */
+        .panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+            padding: 15px 20px;
         }
+
+        .header-panel { font-size: 1.2rem; color: #4A55A2; font-weight: 600; }
         
+        .status-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        .status-indicator { display: flex; align-items: center; gap: 10px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-active { background: #28a745; } .status-recording { background: #dc3545; } 
+        .status-idle { background: #6c757d; } .status-validating { background: #ffc107; }
+
+        .video-panel {
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .metrics-panel {
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            min-height: 0;
+        }
+        .metrics-panel h3 { color: #4A55A2; margin-bottom: 15px; }
+
+        /* --- Video & Canvas --- */
         .video-container {
             position: relative;
             width: 100%;
             background: #111;
-            border-radius: 10px;
+            border-radius: 15px;
             overflow: hidden;
             aspect-ratio: 16/9;
+            flex-grow: 1;
         }
         
         #video, #canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
         }
-        
         #canvas { pointer-events: none; z-index: 1; }
         
-        .pace-indicator, .rep-counter {
-            position: absolute;
-            z-index: 2;
-            top: 15px;
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
-            border-radius: 8px;
-            font-weight: bold;
-            display: none;
+        .video-overlay {
+            position: absolute; z-index: 2; top: 15px; background: rgba(0, 0, 0, 0.6);
+            color: white; border-radius: 8px; font-weight: bold; display: none;
         }
-        .pace-indicator { right: 15px; width: 50px; height: 50px; font-size: 24px; align-items: center; justify-content: center; }
+        .pace-indicator { right: 15px; width: 50px; height: 50px; font-size: 24px; display: none; align-items: center; justify-content: center;}
         .rep-counter { left: 15px; padding: 8px 15px; font-size: 1.2rem; }
         
-        .metrics-panel {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.1);
-            max-height: 65vh;
-            overflow-y: auto;
+        /* --- Controls & Buttons --- */
+        .controls-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
         }
-        
-        .metric-item {
-            background: rgba(102, 126, 234, 0.08);
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 8px;
+        .controls-container .btn:first-child { grid-column: 1 / -1; } /* Start Camera is full width */
+
+        .btn {
+            padding: 12px 18px; border: none; border-radius: 12px; font-size: 1rem;
+            font-weight: 600; cursor: pointer; transition: all 0.2s ease; color: white;
         }
-        
+        .btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-start { background: linear-gradient(45deg, #667eea, #764ba2); }
+        .btn-calibrate { background: linear-gradient(45deg, #4facfe, #00f2fe); }
+        .btn-record { background: linear-gradient(45deg, #43e97b, #38f9d7); }
+        .btn-stop { background: linear-gradient(45deg, #f093fb, #f5576c); }
+        .btn-report { background: linear-gradient(45deg, #9890e3, #b1f4cf); }
+
+        /* --- Metrics & Discrepancies --- */
+        .metric-item { background: rgba(255, 255, 255, 0.5); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
         .metric-label { font-size: 0.8rem; color: #555; margin-bottom: 3px; }
         .metric-value { font-size: 1.3rem; font-weight: bold; color: #333; }
         .metric-unit { font-size: 0.8rem; color: #888; margin-left: 4px; }
         
-        .controls {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 10px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.1);
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: white;
-        }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-        
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); }
-        .btn-success { background: linear-gradient(135deg, #43e97b, #38f9d7); }
-        .btn-danger { background: linear-gradient(135deg, #f093fb, #f5576c); }
-        .btn-info { background: linear-gradient(135deg, #4facfe, #00f2fe); }
-        
-        .status-bar {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 8px 15px;
-            margin-bottom: 10px;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.8rem;
-        }
-        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .status-active { background: #43e97b; } .status-recording { background: #f5576c; } .status-idle { background: #999; } .status-validating { background: #ffc107; }
-        
-        .discrepancy-item { padding: 8px; margin: 4px 0; border-radius: 5px; font-size: 0.85rem; }
-        .severity-high { background: rgba(245, 87, 108, 0.2); border-left: 4px solid #f5576c; }
-        .severity-medium { background: rgba(255, 193, 7, 0.2); border-left: 4px solid #ffc107; }
-        .severity-low { background: rgba(67, 233, 123, 0.2); border-left: 4px solid #43e97b; }
-        
+        .discrepancy-item { padding: 8px; margin: 4px 0; border-radius: 5px; font-size: 0.85rem; border-left-width: 4px; border-left-style: solid;}
+        .severity-high { background: rgba(245, 87, 108, 0.2); border-color: #f5576c; }
+        .severity-medium { background: rgba(255, 193, 7, 0.2); border-color: #ffc107; }
+        .severity-low { background: rgba(67, 233, 123, 0.2); border-color: #43e97b; }
+
+        /* --- Modal --- */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; border-radius: 20px; padding: 30px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; }
         .chart-container { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
-        .report-section { margin-bottom: 20px; } .report-section h3 { color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 5px; margin-bottom: 10px; }
+        .report-section { margin-bottom: 20px; } .report-section h3 { color: #4A55A2; border-bottom: 2px solid #667eea; padding-bottom: 5px; margin-bottom: 10px; }
         .report-discrepancy { border-left-width: 5px; border-left-style: solid; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
         .report-discrepancy-high { border-color: #f5576c; background-color: rgba(245, 87, 108, 0.1); }
         .report-discrepancy-medium { border-color: #ffc107; background-color: rgba(255, 193, 7, 0.1); }
         .report-discrepancy strong { display: block; font-size: 1.1em; margin-bottom: 5px; } .report-discrepancy p { margin: 3px 0; }
+        .modal-controls { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;}
+
+        /* --- Mobile Optimization --- */
+        @media (max-width: 900px) {
+            body, .app-container { padding: 10px; }
+            .main-content { grid-template-columns: 1fr; }
+            .video-panel { order: 1; }
+            .metrics-panel { order: 2; max-height: 30vh; }
+            .video-container { aspect-ratio: unset; flex-grow: 0; height: 35vh; }
+            .btn { font-size: 0.9rem; padding: 10px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Physio-Mimica Pro: Shoulder Analysis</h1>
+    <div class="app-container">
+        <div class="panel header-panel">
+            Physio-Mimica Pro: Shoulder Analysis
         </div>
         
-        <div class="status-bar">
-            <div>
-                <span class="status-indicator status-idle" id="statusIndicator"></span>
+        <div class="panel status-panel">
+            <div class="status-indicator">
+                <div class="status-dot status-idle" id="statusDot"></div>
                 <span id="statusText">Ready</span>
             </div>
             <div>
@@ -185,425 +175,323 @@
             </div>
         </div>
         
-        <div class="main-grid">
-            <div class="video-section">
+        <div class="main-content">
+            <div class="panel video-panel">
                 <div class="video-container">
                     <video id="video" style="display: none;"></video>
                     <canvas id="canvas"></canvas>
-                    <div class="pace-indicator" id="paceIndicator">↕</div>
-                    <div class="rep-counter" id="repCounter">Rep: 0/10</div>
+                    <div class="video-overlay pace-indicator" id="paceIndicator">↕</div>
+                    <div class="video-overlay rep-counter" id="repCounter">Rep: 0/10</div>
                 </div>
-                 <div class="controls">
-                    <button id="startBtn" class="btn btn-primary">Start Camera</button>
-                    <button id="calibrateBtn" class="btn btn-info" disabled>Calibrate</button>
-                    <button id="recordBtn" class="btn btn-success" disabled>Record</button>
-                    <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
-                    <button id="reportBtn" class="btn btn-primary" disabled>Generate Report</button>
+                 <div class="controls-container">
+                    <button id="startBtn" class="btn btn-start">Start Camera</button>
+                    <button id="calibrateBtn" class="btn btn-calibrate">Calibrate</button>
+                    <button id="recordBtn" class="btn btn-record">Record</button>
+                    <button id="stopBtn" class="btn btn-stop">Stop</button>
+                    <button id="reportBtn" class="btn btn-report">Generate Report</button>
                 </div>
             </div>
             
-            <div class="metrics-panel">
-                <h3 style="margin-bottom: 15px; color: #667eea;">Live Metrics</h3>
+            <div class="panel metrics-panel">
+                <h3>Live Metrics</h3>
                 <div id="metricsContainer"></div>
-                <div class="metric-label" style="margin-top: 20px;">Movement Quality Alerts</div>
+                <h3 style="margin-top: 20px;">Movement Quality Alerts</h3>
                 <div id="discrepancyContainer"></div>
             </div>
         </div>
         
-        <!-- Report Modal -->
         <div class="modal" id="reportModal">
             <div class="modal-content">
                 <h2>Session Report</h2>
                 <div id="reportContent"></div>
                 <div class="chart-container"><canvas id="timeSeriesChart"></canvas></div>
                 <div class="chart-container"><canvas id="symmetryChart"></canvas></div>
-                <div class="control-row" style="margin-top: 20px; justify-content: flex-end;">
-                    <button onclick="exportReport('pdf')" class="btn btn-primary">Download PDF</button>
-                    <button onclick="closeModal()" class="btn btn-danger">Close</button>
+                <div class="modal-controls">
+                    <button onclick="exportReport('pdf')" class="btn btn-start">Download PDF</button>
+                    <button onclick="closeModal()" class="btn btn-stop">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script type="module">
+        // Application States: IDLE, CAMERA_ON, CALIBRATED, RECORDING, FINISHED
+        let appState = 'IDLE';
+
         // ========== CONFIGURATION ==========
         const CONFIG = {
-            confidenceThreshold: 0.7, // Increased for clinical accuracy
+            confidenceThreshold: 0.7,
             normatives: {
                 shoulder_rom: {
-                    abduction: { min: 150, max: 180, optimal: 170 },
-                    torsoLeanMax: 10, // Stricter threshold
+                    abduction: { min: 150, max: 180 },
+                    torsoLeanMax: 10,
                     shoulderHikeMax: 0.05, // Normalized screen height
                     torsoRotationMax: 0.2, // Normalized depth difference
                     symmetryDiffMax: 15
                 }
             },
-            pacing: { up: 2, down: 3 } // Slower eccentric phase
+            pacing: { up: 2, down: 3 }
         };
 
-        // ========== GLOBAL STATE ==========
-        let pose = null;
-        let camera = null;
-        let isRecording = false;
-        let isCalibrating = false;
-        let calibrationData = { baseline: null };
+        // ========== GLOBAL STATE & ELEMENTS ==========
+        let pose, camera, calibrationData = { baseline: null };
         let lastFrameTime = performance.now();
-        let repCount = 0;
-        let targetReps = 10;
-        let paceInterval = null;
-        
-        window.myTimeSeriesChart = null;
-        window.mySymmetryChart = null;
+        let repCount = 0, targetReps = 10, paceInterval = null;
+        let sessionData = {};
 
-        // ========== DOM ELEMENTS ==========
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const canvasCtx = canvas.getContext('2d');
         
-        // ========== LANDMARK MAPPING (BlazePose) ==========
-        const Landmark = {
-            LEFT_SHOULDER: 11, RIGHT_SHOULDER: 12,
-            LEFT_ELBOW: 13,    RIGHT_ELBOW: 14,
-            LEFT_WRIST: 15,    RIGHT_WRIST: 16,
-            LEFT_HIP: 23,      RIGHT_HIP: 24
-        };
+        const Landmark = { LEFT_SHOULDER: 11, RIGHT_SHOULDER: 12, LEFT_ELBOW: 13, RIGHT_ELBOW: 14, LEFT_HIP: 23, RIGHT_HIP: 24 };
 
-        // ========== JOINT PROCESSOR CLASS ==========
+        // ========== CLASS DEFINITIONS (Metrics, Analysis, Reporting, etc.) ==========
         class JointProcessor {
             processLandmarks(landmarks) {
                 if (!landmarks) return {};
                 const joints = {};
                 for (const [name, index] of Object.entries(Landmark)) {
                     const lm = landmarks[index];
-                    if (lm && lm.visibility > CONFIG.confidenceThreshold) {
-                        joints[name] = { x: lm.x, y: lm.y, z: lm.z, visibility: lm.visibility };
-                    }
+                    if (lm && lm.visibility > CONFIG.confidenceThreshold) joints[name] = { x: lm.x, y: lm.y, z: lm.z };
                 }
                 return joints;
             }
         }
-
-        // ========== METRICS CALCULATOR CLASS ==========
         class MetricsCalculator {
             constructor() { this.romTracking = {}; }
-
             calculateAngle3D(p1, p2, p3) {
                 if (!p1 || !p2 || !p3) return null;
                 const v1 = { x: p1.x - p2.x, y: p1.y - p2.y, z: p1.z - p2.z };
                 const v2 = { x: p3.x - p2.x, y: p3.y - p2.y, z: p3.z - p2.z };
-                
                 const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
                 const mag1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
                 const mag2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
-                
                 if (mag1 === 0 || mag2 === 0) return 0;
                 return Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
             }
-            
             calculateMetrics(joints) {
                 const metrics = {};
-                
                 metrics.leftShoulderAbduction = this.calculateAngle3D(joints.LEFT_ELBOW, joints.LEFT_SHOULDER, joints.LEFT_HIP);
                 metrics.rightShoulderAbduction = this.calculateAngle3D(joints.RIGHT_ELBOW, joints.RIGHT_SHOULDER, joints.RIGHT_HIP);
-
                 if (joints.LEFT_SHOULDER && joints.RIGHT_SHOULDER && joints.LEFT_HIP && joints.RIGHT_HIP) {
                     const shoulderMid = { y: (joints.LEFT_SHOULDER.y + joints.RIGHT_SHOULDER.y) / 2, x: (joints.LEFT_SHOULDER.x + joints.RIGHT_SHOULDER.x) / 2 };
                     const hipMid = { y: (joints.LEFT_HIP.y + joints.RIGHT_HIP.y) / 2, x: (joints.LEFT_HIP.x + joints.RIGHT_HIP.x) / 2 };
                     metrics.torsoAngle = Math.atan2(hipMid.y - shoulderMid.y, hipMid.x - shoulderMid.x) * 180 / Math.PI - 90;
                     metrics.torsoRotation = Math.abs(joints.LEFT_SHOULDER.z - joints.RIGHT_SHOULDER.z);
                 }
-
                 if (calibrationData.baseline && joints.LEFT_SHOULDER && joints.RIGHT_SHOULDER) {
                     metrics.leftShoulderHike = calibrationData.baseline.leftShoulderY - joints.LEFT_SHOULDER.y;
                     metrics.rightShoulderHike = calibrationData.baseline.rightShoulderY - joints.RIGHT_SHOULDER.y;
                 }
-
                 this.updateROM(metrics);
-                
                 if (metrics.leftShoulderAbduction_ROM !== undefined && metrics.rightShoulderAbduction_ROM !== undefined) {
                     metrics.shoulderSymmetryDifference = Math.abs(metrics.leftShoulderAbduction_ROM - metrics.rightShoulderAbduction_ROM);
                 }
-                
                 return metrics;
             }
-            
             updateROM(metrics) {
-                if (!isRecording) return;
+                if (appState !== 'RECORDING') return;
                 ['leftShoulderAbduction', 'rightShoulderAbduction'].forEach(key => {
                     const value = metrics[key];
                     if (value !== null && !isNaN(value)) {
                         const romKey = `${key}_ROM`;
-                        if (!this.romTracking[romKey] || value > this.romTracking[romKey]) {
-                            this.romTracking[romKey] = value;
-                        }
+                        if (!this.romTracking[romKey] || value > this.romTracking[romKey]) this.romTracking[romKey] = value;
                         metrics[romKey] = this.romTracking[romKey];
                     }
                 });
             }
-            
             reset() { this.romTracking = {}; }
         }
-
-        // ========== DISCREPANCY ANALYZER CLASS ==========
         class DiscrepancyAnalyzer {
             analyze(metrics) {
-                const discrepancies = [];
-                const norm = CONFIG.normatives.shoulder_rom;
-
+                const discrepancies = []; const norm = CONFIG.normatives.shoulder_rom;
                 const maxROM = Math.max(metrics.leftShoulderAbduction_ROM || 0, metrics.rightShoulderAbduction_ROM || 0);
-                if (maxROM > 30 && maxROM < norm.abduction.min) {
-                     discrepancies.push(this.create('Limited Range of Motion', 'high', `Max abduction was ${maxROM.toFixed(0)}° (Target: ${norm.abduction.min}°+)`, 'Possible joint stiffness or muscle weakness.', 'Pendulum exercises, wall slides.'));
-                }
-                
-                if (Math.abs(metrics.torsoAngle || 0) > norm.torsoLeanMax) {
-                    discrepancies.push(this.create('Compensatory Torso Lean', 'medium', `Torso leaned by ${Math.abs(metrics.torsoAngle || 0).toFixed(0)}°.`, 'Compensating for weak deltoid/supraspinatus muscles.', 'Perform abduction against a wall to ensure upright torso.'));
-                }
-
-                if ((metrics.torsoRotation || 0) > norm.torsoRotationMax) {
-                     discrepancies.push(this.create('Torso Rotation', 'medium', `Body rotated to assist lift.`, 'A common compensation to achieve perceived full range.', 'Focus on isolating shoulder movement. Keep hips and shoulders square.'));
-                }
-                
+                if (maxROM > 30 && maxROM < norm.abduction.min) discrepancies.push(this.create('Limited ROM', 'high', `Max abduction: ${maxROM.toFixed(0)}°`, 'Joint stiffness or weakness.', 'Pendulum exercises, wall slides.'));
+                if (Math.abs(metrics.torsoAngle || 0) > norm.torsoLeanMax) discrepancies.push(this.create('Torso Lean', 'medium', `Leaned by ${Math.abs(metrics.torsoAngle || 0).toFixed(0)}°`, 'Weak deltoid/supraspinatus.', 'Perform against a wall.'));
+                if ((metrics.torsoRotation || 0) > norm.torsoRotationMax) discrepancies.push(this.create('Torso Rotation', 'medium', `Body rotated to assist lift.`, 'Compensation for poor ROM.', 'Keep hips/shoulders square.'));
                 const maxHike = Math.max(metrics.leftShoulderHike || 0, metrics.rightShoulderHike || 0);
-                if (maxHike > norm.shoulderHikeMax) {
-                     discrepancies.push(this.create('Shoulder Hiking', 'high', `Shoulder was elevated during abduction.`, 'Over-activation of upper trapezius, often due to rotator cuff weakness.', 'Practice depressing the shoulder blade (scapular setting) before lifting.'));
-                }
-                
-                if ((metrics.shoulderSymmetryDifference || 0) > norm.symmetryDiffMax) {
-                    discrepancies.push(this.create('Movement Asymmetry', 'medium', `Difference of ${metrics.shoulderSymmetryDifference.toFixed(0)}° between left and right ROM.`, 'Could indicate unilateral injury or muscle imbalance.', 'Incorporate single-arm exercises to strengthen the weaker side.'));
-                }
-                
+                if (maxHike > norm.shoulderHikeMax) discrepancies.push(this.create('Shoulder Hiking', 'high', `Shoulder elevated during lift.`, 'Over-active upper trapezius.', 'Practice scapular setting.'));
+                if ((metrics.shoulderSymmetryDifference || 0) > norm.symmetryDiffMax) discrepancies.push(this.create('Asymmetry', 'medium', `Difference of ${metrics.shoulderSymmetryDifference.toFixed(0)}° in ROM.`, 'Unilateral injury/imbalance.', 'Incorporate single-arm exercises.'));
                 return discrepancies;
             }
             create(metric, severity, issue, cause, recommendation) { return { metric, severity, issue, cause, recommendation }; }
         }
-        
-        // ========== DATA & REPORTING CLASSES ==========
         class DataRecorder {
             constructor() { this.frames = []; }
             addFrame(frameData) { this.frames.push({ timestamp: performance.now(), ...frameData }); }
             generateSummary() {
-                const summary = { metrics_summary: {}, discrepancy_summary: [] };
-                const metricData = {}; 
-                const discrepancySet = new Map();
-
+                const summary = { metrics_summary: {}, discrepancy_summary: [] }; const metricData = {}; const discrepancySet = new Map();
                 this.frames.forEach(f => {
-                    Object.entries(f.metrics).forEach(([key, value]) => {
-                        if (typeof value === 'number' && !isNaN(value)) {
-                            if (!metricData[key]) metricData[key] = [];
-                            metricData[key].push(value);
-                        }
-                    });
+                    Object.entries(f.metrics).forEach(([key, value]) => { if (typeof value === 'number' && !isNaN(value)) { if (!metricData[key]) metricData[key] = []; metricData[key].push(value); }});
                     f.discrepancies.forEach(d => { if (!discrepancySet.has(d.issue)) discrepancySet.set(d.issue, d); });
                 });
-                
-                Object.entries(metricData).forEach(([key, values]) => {
-                    const sum = values.reduce((a, b) => a + b, 0);
-                    summary.metrics_summary[key] = {
-                        average: sum / values.length, 
-                        min: Math.min(...values),
-                        max: Math.max(...values),
-                    };
-                });
-                
-                summary.discrepancy_summary = Array.from(discrepancySet.values());
-                return summary;
+                Object.entries(metricData).forEach(([key, values]) => { const sum = values.reduce((a, b) => a + b, 0); summary.metrics_summary[key] = { average: sum / values.length, min: Math.min(...values), max: Math.max(...values) }; });
+                summary.discrepancy_summary = Array.from(discrepancySet.values()); return summary;
             }
             reset() { this.frames = []; }
         }
-
         class ReportGenerator {
             generateHTML(data) {
                 let html = `<div class="report-section"><h3>Session Overview</h3><p><strong>Session ID:</strong> ${data.session_id}</p><p><strong>Duration:</strong> ${data.duration.toFixed(1)}s</p><p><strong>Date:</strong> ${new Date(data.startTime).toLocaleString()}</p></div>`;
                 html += '<div class="report-section"><h3>Movement Quality Analysis</h3>';
-                if (data.summary.discrepancy_summary.length > 0) {
-                    data.summary.discrepancy_summary.forEach(d => { html += `<div class="report-discrepancy report-discrepancy-${d.severity}"><strong>${d.metric}</strong><p><strong>Issue:</strong> ${d.issue}</p><p><strong>Likely Cause:</strong> ${d.cause}</p><p><strong>Recommendation:</strong> ${d.recommendation}</p></div>`; });
-                } else { html += '<p style="color: #43e97b; font-weight: bold;">✓ No significant discrepancies detected. Excellent performance!</p>'; }
+                if (data.summary.discrepancy_summary.length > 0) { data.summary.discrepancy_summary.forEach(d => { html += `<div class="report-discrepancy report-discrepancy-${d.severity}"><strong>${d.metric}</strong><p><strong>Issue:</strong> ${d.issue}</p><p><strong>Likely Cause:</strong> ${d.cause}</p><p><strong>Recommendation:</strong> ${d.recommendation}</p></div>`; });
+                } else { html += '<p style="color: #28a745; font-weight: bold;">✓ No significant discrepancies detected. Excellent performance!</p>'; }
                 return html + '</div>';
             }
-
             renderCharts(data) {
-                const labels = data.frames.map((_, i) => i);
-                const lData = data.frames.map(f => f.metrics.leftShoulderAbduction);
-                const rData = data.frames.map(f => f.metrics.rightShoulderAbduction);
+                const labels = data.frames.map((_, i) => i); const lData = data.frames.map(f => f.metrics.leftShoulderAbduction); const rData = data.frames.map(f => f.metrics.rightShoulderAbduction);
                 if (window.myTimeSeriesChart) window.myTimeSeriesChart.destroy();
-                window.myTimeSeriesChart = new Chart(document.getElementById('timeSeriesChart'), { type: 'line', data: { labels, datasets: [ { label: 'Left Shoulder', data: lData, borderColor: '#667eea', tension: 0.2, fill: false }, { label: 'Right Shoulder', data: rData, borderColor: '#764ba2', tension: 0.2, fill: false } ]}, options: { plugins: { title: { display: true, text: 'Shoulder Abduction Angle Over Time' } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Angle (°)' } } }} });
-
+                window.myTimeSeriesChart = new Chart(document.getElementById('timeSeriesChart'), { type: 'line', data: { labels, datasets: [ { label: 'Left Shoulder', data: lData, borderColor: '#667eea', tension: 0.2 }, { label: 'Right Shoulder', data: rData, borderColor: '#764ba2', tension: 0.2 } ]}, options: { plugins: { title: { display: true, text: 'Shoulder Abduction Angle Over Time' } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'Angle (°)' } } }} });
                 const summary = data.summary.metrics_summary;
                 if (summary.leftShoulderAbduction_ROM && summary.rightShoulderAbduction_ROM) {
                     if (window.mySymmetryChart) window.mySymmetryChart.destroy();
                     window.mySymmetryChart = new Chart(document.getElementById('symmetryChart'), { type: 'bar', data: { labels: ['Left ROM', 'Right ROM'], datasets: [{ label: 'Peak Range of Motion (°)', data: [summary.leftShoulderAbduction_ROM.max, summary.rightShoulderAbduction_ROM.max], backgroundColor: ['#764ba2', '#667eea'] }] }, options: { plugins: { title: { display: true, text: 'Bilateral Symmetry Comparison' }}, scales: { y: { beginAtZero: true, suggestedMax: 180, title: { display: true, text: 'ROM (°)' } } }} });
                 }
             }
-
             generatePDF(data) {
                 const { jsPDF } = window.jspdf; const doc = new jsPDF();
                 doc.setFontSize(20); doc.setTextColor('#667eea'); doc.text('Physio-Mimica Pro: Shoulder Report', 20, 20);
                 doc.setFontSize(12); doc.setTextColor(0);
                 doc.text(`Session ID: ${data.session_id}`, 20, 35); doc.text(`Duration: ${data.duration.toFixed(1)}s`, 20, 42); doc.text(`Date: ${new Date(data.startTime).toLocaleString()}`, 20, 49);
-                let yPos = 65;
-                doc.setFontSize(14); doc.setTextColor('#667eea'); doc.text('Movement Quality Assessment', 20, yPos); yPos += 10;
+                let yPos = 65; doc.setFontSize(14); doc.setTextColor('#667eea'); doc.text('Movement Quality Assessment', 20, yPos); yPos += 10;
                 doc.setFontSize(10); doc.setTextColor(0);
-                if (data.summary.discrepancy_summary.length > 0) {
-                    data.summary.discrepancy_summary.forEach(d => {
-                        if (yPos > 260) { doc.addPage(); yPos = 20; }
-                        doc.setFont(undefined, 'bold'); doc.text(`${d.metric} (${d.severity}):`, 25, yPos); yPos += 6;
-                        doc.setFont(undefined, 'normal');
-                        const lines = doc.splitTextToSize(`Issue: ${d.issue}\nCause: ${d.cause}\nRecommendation: ${d.recommendation}`, 160);
-                        doc.text(lines, 30, yPos); yPos += lines.length * 5 + 3;
-                    });
-                } else { doc.setTextColor('#43e97b'); doc.text('✓ No significant discrepancies detected.', 25, yPos); yPos += 10; doc.setTextColor(0); }
-                
+                if (data.summary.discrepancy_summary.length > 0) { data.summary.discrepancy_summary.forEach(d => { if (yPos > 260) { doc.addPage(); yPos = 20; } doc.setFont(undefined, 'bold'); doc.text(`${d.metric} (${d.severity}):`, 25, yPos); yPos += 6; doc.setFont(undefined, 'normal'); const lines = doc.splitTextToSize(`Issue: ${d.issue}\nCause: ${d.cause}\nRecommendation: ${d.recommendation}`, 160); doc.text(lines, 30, yPos); yPos += lines.length * 5 + 3; });
+                } else { doc.setTextColor('#28a745'); doc.text('✓ No significant discrepancies detected.', 25, yPos); yPos += 10; doc.setTextColor(0); }
                 if (window.myTimeSeriesChart) { doc.addPage(); doc.text('Joint Angle Progression', 20, 20); doc.addImage(document.getElementById('timeSeriesChart').toDataURL('image/png'), 'PNG', 20, 30, 170, 90); }
                 if (window.mySymmetryChart) { doc.text('Bilateral Symmetry', 20, 135); doc.addImage(document.getElementById('symmetryChart').toDataURL('image/png'), 'PNG', 20, 145, 170, 90); }
                 doc.save(`physio_mimica_shoulder_${data.session_id}.pdf`);
             }
         }
-        
-        // ========== REPETITION DETECTOR ==========
         class RepetitionDetector {
             constructor() { this.state = 'down'; this.threshold = 45; this.peak = 0; }
             detectRep(metrics) {
                 const val = Math.max(metrics.leftShoulderAbduction || 0, metrics.rightShoulderAbduction || 0);
-                if (this.state === 'down' && val > this.threshold) {
-                    this.state = 'up'; this.peak = val; return false;
-                } else if (this.state === 'up') {
-                    this.peak = Math.max(this.peak, val);
-                    if (this.peak - val > this.threshold * 0.7) {
-                        this.state = 'down'; this.peak = 0; return true;
-                    }
-                }
+                if (this.state === 'down' && val > this.threshold) { this.state = 'up'; this.peak = val; return false;
+                } else if (this.state === 'up') { this.peak = Math.max(this.peak, val); if (this.peak - val > this.threshold * 0.7) { this.state = 'down'; this.peak = 0; return true; } }
                 return false;
             }
             reset() { this.state = 'down'; this.peak = 0; }
         }
-        
+
+        // ========== INITIALIZE CLASSES ==========
         const jointProcessor = new JointProcessor();
         const metricsCalculator = new MetricsCalculator();
         const discrepancyAnalyzer = new DiscrepancyAnalyzer();
         const dataRecorder = new DataRecorder();
         const reportGenerator = new ReportGenerator();
         let repDetector = new RepetitionDetector();
-        let sessionData = {};
         
+        // ========== MEDIAPIPE HANDLER ==========
         function onResults(results) {
             const now = performance.now();
-            updateFPS(now);
+            document.getElementById('fpsCounter').textContent = `${(1000 / (now - lastFrameTime)).toFixed(0)} FPS`;
             lastFrameTime = now;
             
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+            canvasCtx.save(); canvasCtx.clearRect(0, 0, canvas.width, canvas.height); canvasCtx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
             
             if (results.poseLandmarks) {
                 drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#667eea', lineWidth: 4});
-                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#764ba2', lineWidth: 2, radius: 5});
+                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#764ba2', radius: 5});
 
                 const joints = jointProcessor.processLandmarks(results.poseLandmarks);
-                if (Object.keys(joints).length > 6) { // Check if main joints are visible
-                    if (document.getElementById('calibrateBtn').disabled) updateStatus('Position Valid. Please Calibrate.', 'status-active');
+                if (Object.keys(joints).length > 4) {
+                    if(appState === 'IDLE') updateAppState('CAMERA_ON');
                     const metrics = metricsCalculator.calculateMetrics(joints);
                     const discrepancies = discrepancyAnalyzer.analyze(metrics);
                     updateMetricsDisplay(metrics);
                     updateDiscrepancyDisplay(discrepancies);
                     
-                    if (isRecording) {
+                    if (appState === 'RECORDING') {
                         dataRecorder.addFrame({ metrics, discrepancies });
                         if (repDetector.detectRep(metrics)) {
-                            repCount++;
-                            document.getElementById('repCounter').textContent = `Rep: ${repCount}/${targetReps}`;
-                            if (repCount >= targetReps) setTimeout(() => { if (isRecording) stopRecording(); }, 1000);
+                            repCount++; document.getElementById('repCounter').textContent = `Rep: ${repCount}/${targetReps}`;
+                            if (repCount >= targetReps) setTimeout(() => { if (appState === 'RECORDING') handleStop(); }, 1000);
                         }
                     }
                 }
             }
-            if(isCalibrating) {
-                 canvasCtx.fillStyle = "rgba(255, 255, 255, 0.8)";
-                 canvasCtx.font = "bold 30px sans-serif";
-                 canvasCtx.textAlign = "center";
-                 canvasCtx.fillText("Calibrating... Stand Still", canvas.width / 2, canvas.height / 2);
-            }
+            if(appState === 'CALIBRATING') { canvasCtx.fillStyle = "rgba(0, 0, 0, 0.7)"; canvasCtx.font = "bold 3vw sans-serif"; canvasCtx.textAlign = "center"; canvasCtx.fillText("Calibrating... Stand Still", canvas.width / 2, canvas.height / 2); }
             canvasCtx.restore();
         }
 
-        // ========== CORE APPLICATION LOGIC ==========
-        function startCamera() {
+        // ========== CORE APPLICATION LOGIC & STATE MANAGEMENT ==========
+        function updateAppState(newState) {
+            appState = newState;
+            const buttons = { start: document.getElementById('startBtn'), calibrate: document.getElementById('calibrateBtn'), record: document.getElementById('recordBtn'), stop: document.getElementById('stopBtn'), report: document.getElementById('reportBtn') };
+            
+            // Default: all disabled
+            Object.values(buttons).forEach(btn => btn.disabled = true);
+            
+            switch (appState) {
+                case 'IDLE':
+                    buttons.start.disabled = false;
+                    updateStatus('Ready', 'idle');
+                    break;
+                case 'CAMERA_ON':
+                    buttons.start.disabled = false; // Allow restarting camera if needed
+                    buttons.calibrate.disabled = false;
+                    updateStatus('Camera On. Please Calibrate.', 'validating');
+                    break;
+                case 'CALIBRATED':
+                    buttons.calibrate.disabled = false; // Allow recalibration
+                    buttons.record.disabled = false;
+                    updateStatus('Calibrated. Ready to Record.', 'active');
+                    break;
+                case 'CALIBRATING':
+                    updateStatus('Calibrating...', 'validating');
+                    break;
+                case 'RECORDING':
+                    buttons.stop.disabled = false;
+                    updateStatus('Recording...', 'recording');
+                    break;
+                case 'FINISHED':
+                    buttons.calibrate.disabled = false;
+                    buttons.record.disabled = false;
+                    buttons.report.disabled = false;
+                    updateStatus('Session Finished. View Report.', 'active');
+                    break;
+            }
+        }
+
+        function handleStartCamera() {
+            if (camera) { camera.start(); return; }
             pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
             pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
             pose.onResults(onResults);
-            
             camera = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 1280, height: 720 });
-            camera.start().then(() => {
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('calibrateBtn').disabled = false;
-                updateStatus('Camera started. Position yourself in frame.', 'status-validating');
-            }).catch(e => {
-                alert("Failed to start camera. Please grant permissions and ensure no other app is using it.");
-                console.error(e);
-            });
+            camera.start().catch(e => { alert("Failed to start camera. Please grant permissions."); console.error(e); updateAppState('IDLE'); });
         }
-        
-        function calibrate() {
-            updateStatus('Calibrating... Stand naturally with arms at your sides', 'status-validating');
-            isCalibrating = true;
-            
+
+        function handleCalibrate() {
+            updateAppState('CALIBRATING');
             setTimeout(() => {
-                isCalibrating = false;
-                const lastResults = pose.o[0]; // Access last result from MediaPipe instance
+                const lastResults = pose.o[0];
                 if (lastResults && lastResults.poseLandmarks) {
                     const joints = jointProcessor.processLandmarks(lastResults.poseLandmarks);
                     if (joints.LEFT_SHOULDER && joints.RIGHT_SHOULDER) {
-                        calibrationData.baseline = {
-                            leftShoulderY: joints.LEFT_SHOULDER.y,
-                            rightShoulderY: joints.RIGHT_SHOULDER.y
-                        };
-                        document.getElementById('recordBtn').disabled = false;
-                        updateStatus('Calibration Complete. Ready to record.', 'status-active');
-                    } else { alert('Calibration failed. Shoulders not clearly visible.'); }
-                } else { alert('Calibration failed. No person detected.'); }
+                        calibrationData.baseline = { leftShoulderY: joints.LEFT_SHOULDER.y, rightShoulderY: joints.RIGHT_SHOULDER.y };
+                        updateAppState('CALIBRATED');
+                    } else { alert('Calibration failed: Shoulders not visible.'); updateAppState('CAMERA_ON'); }
+                } else { alert('Calibration failed: No person detected.'); updateAppState('CAMERA_ON'); }
             }, 3000);
         }
-        
-        function startRecording() {
+
+        function handleRecord() {
             dataRecorder.reset(); metricsCalculator.reset(); repCount = 0; repDetector.reset();
-            isRecording = true;
             sessionData = { session_id: `S${Date.now()}`, startTime: Date.now() };
-            
-            document.getElementById('recordBtn').disabled = true; document.getElementById('stopBtn').disabled = false;
-            document.getElementById('reportBtn').disabled = true; document.getElementById('calibrateBtn').disabled = true;
             document.getElementById('sessionId').textContent = sessionData.session_id;
-            
-            document.getElementById('repCounter').style.display = 'block';
-            document.getElementById('repCounter').textContent = `Rep: 0/${targetReps}`;
-            startPaceIndicator();
-            updateStatus('Recording...', 'status-recording');
-        }
-        
-        function stopRecording() {
-            isRecording = false;
-            sessionData.endTime = Date.now();
-            sessionData.duration = (sessionData.endTime - sessionData.startTime) / 1000;
-            
-            document.getElementById('recordBtn').disabled = false; document.getElementById('stopBtn').disabled = true;
-            document.getElementById('reportBtn').disabled = false; document.getElementById('calibrateBtn').disabled = false;
-            
-            document.getElementById('repCounter').style.display = 'none'; document.getElementById('paceIndicator').style.display = 'none';
-            if (paceInterval) clearInterval(paceInterval); paceInterval = null;
-            updateStatus('Recording Stopped', 'status-active');
+            startPaceIndicator(); document.getElementById('repCounter').style.display = 'block';
+            updateAppState('RECORDING');
         }
 
-        function startPaceIndicator() {
-            const paceDiv = document.getElementById('paceIndicator'); paceDiv.style.display = 'flex';
-            const totalCycle = (CONFIG.pacing.up + CONFIG.pacing.down) * 1000; let phase = 'up';
-            paceInterval = setInterval(() => {
-                if (phase === 'up') {
-                    paceDiv.textContent = '↑'; paceDiv.style.background = 'rgba(67, 233, 123, 0.5)';
-                    setTimeout(() => { phase = 'down'; paceDiv.textContent = '↓'; paceDiv.style.background = 'rgba(245, 87, 108, 0.5)'; }, CONFIG.pacing.up * 1000);
-                }
-                phase = 'up';
-            }, totalCycle);
+        function handleStop() {
+            sessionData.endTime = Date.now();
+            sessionData.duration = (sessionData.endTime - sessionData.startTime) / 1000;
+            stopPaceIndicator(); document.getElementById('repCounter').style.display = 'none';
+            updateAppState('FINISHED');
         }
         
-        function generateReport() {
+        function handleGenerateReport() {
             const data = { ...sessionData, frames: dataRecorder.frames, summary: dataRecorder.generateSummary() };
             document.getElementById('reportContent').innerHTML = reportGenerator.generateHTML(data);
             reportGenerator.renderCharts(data);
@@ -611,56 +499,45 @@
             window.currentReportData = data;
         }
 
-        // ========== UI UPDATE FUNCTIONS ==========
-        function updateMetricsDisplay(metrics) {
-            const container = document.getElementById('metricsContainer'); container.innerHTML = '';
-            const metricsToShow = {
-                "L Shoulder Angle": {val: metrics.leftShoulderAbduction, unit: '°'},
-                "R Shoulder Angle": {val: metrics.rightShoulderAbduction, unit: '°'},
-                "Torso Lean": {val: metrics.torsoAngle, unit: '°'},
-                "Torso Rotation": {val: (metrics.torsoRotation * 100), unit: '%'},
-            };
-            Object.entries(metricsToShow).forEach(([label, data]) => {
-                if (data.val !== undefined && data.val !== null) {
-                    const item = document.createElement('div'); item.className = 'metric-item';
-                    item.innerHTML = `<div class="metric-label">${label}</div><div class="metric-value">${data.val.toFixed(1)}<span class="metric-unit">${data.unit}</span></div>`;
-                    container.appendChild(item);
+        function startPaceIndicator() {
+            const paceDiv = document.getElementById('paceIndicator'); paceDiv.style.display = 'flex';
+            const totalCycle = (CONFIG.pacing.up + CONFIG.pacing.down) * 1000; let phase = 'up';
+            paceInterval = setInterval(() => {
+                if (phase === 'up') {
+                    paceDiv.textContent = '↑'; paceDiv.style.background = 'rgba(67, 233, 123, 0.7)';
+                    setTimeout(() => { phase = 'down'; paceDiv.textContent = '↓'; paceDiv.style.background = 'rgba(245, 87, 108, 0.7)'; }, CONFIG.pacing.up * 1000);
                 }
-            });
+                phase = 'up';
+            }, totalCycle);
         }
+        function stopPaceIndicator() { if (paceInterval) { clearInterval(paceInterval); paceInterval = null; } document.getElementById('paceIndicator').style.display = 'none'; }
         
-        function updateDiscrepancyDisplay(discrepancies) {
+        // ========== UI UPDATE & EVENT LISTENERS ==========
+        function updateMetricsDisplay(metrics) { /* ... implementation from previous version ... */
+            const container = document.getElementById('metricsContainer'); container.innerHTML = '';
+            const metricsToShow = { "L Shoulder Angle": {val: metrics.leftShoulderAbduction, unit: '°'}, "R Shoulder Angle": {val: metrics.rightShoulderAbduction, unit: '°'}, "Torso Lean": {val: metrics.torsoAngle, unit: '°'}, "Torso Rotation": {val: (metrics.torsoRotation * 100), unit: '%'},};
+            Object.entries(metricsToShow).forEach(([label, data]) => { if (data.val !== undefined && data.val !== null) { const item = document.createElement('div'); item.className = 'metric-item'; item.innerHTML = `<div class="metric-label">${label}</div><div class="metric-value">${data.val.toFixed(1)}<span class="metric-unit">${data.unit}</span></div>`; container.appendChild(item);}});
+        }
+        function updateDiscrepancyDisplay(discrepancies) { /* ... implementation from previous version ... */
             const container = document.getElementById('discrepancyContainer'); container.innerHTML = '';
-            if (discrepancies.length === 0 && isRecording) {
-                container.innerHTML = '<div class="discrepancy-item severity-low"><strong>✓ Good Form</strong></div>';
-            } else {
-                discrepancies.forEach(d => {
-                    const item = document.createElement('div');
-                    item.className = `discrepancy-item severity-${d.severity}`;
-                    item.innerHTML = `<strong>${d.metric}</strong>`;
-                    container.appendChild(item);
-                });
-            }
+            if (discrepancies.length === 0 && appState === 'RECORDING') { container.innerHTML = '<div class="discrepancy-item severity-low"><strong>✓ Good Form</strong></div>';
+            } else { discrepancies.forEach(d => { const item = document.createElement('div'); item.className = `discrepancy-item severity-${d.severity}`; item.innerHTML = `<strong>${d.metric}</strong>`; container.appendChild(item); });}
         }
-        
         function updateStatus(text, className) {
             document.getElementById('statusText').textContent = text;
-            document.getElementById('statusIndicator').className = `status-indicator ${className}`;
+            document.getElementById('statusDot').className = `status-dot status-${className}`;
         }
         
-        function updateFPS(now) {
-            const fps = 1000 / (now - lastFrameTime);
-            document.getElementById('fpsCounter').textContent = `${fps.toFixed(0)} FPS`;
-        }
-
-        // ========== EVENT LISTENERS & GLOBAL FUNCTIONS ==========
-        document.getElementById('startBtn').addEventListener('click', startCamera);
-        document.getElementById('calibrateBtn').addEventListener('click', calibrate);
-        document.getElementById('recordBtn').addEventListener('click', startRecording);
-        document.getElementById('stopBtn').addEventListener('click', stopRecording);
-        document.getElementById('reportBtn').addEventListener('click', generateReport);
+        document.getElementById('startBtn').addEventListener('click', handleStartCamera);
+        document.getElementById('calibrateBtn').addEventListener('click', handleCalibrate);
+        document.getElementById('recordBtn').addEventListener('click', handleRecord);
+        document.getElementById('stopBtn').addEventListener('click', handleStop);
+        document.getElementById('reportBtn').addEventListener('click', handleGenerateReport);
         window.closeModal = () => { document.getElementById('reportModal').style.display = 'none'; }
         window.exportReport = (format) => { if (window.currentReportData && format === 'pdf') reportGenerator.generatePDF(window.currentReportData); }
+        
+        // Initialize App
+        updateAppState('IDLE');
     </script>
 </body>
 </html>

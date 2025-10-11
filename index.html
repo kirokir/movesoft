@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Physio-Mimica - Clinical Movement Analysis</title>
     
+    <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -343,10 +344,10 @@
             minKeypointsForValidPose: 12,
             // FIXED: Correct MoveNet keypoint names (camelCase)
             jointMap: {
-                C1: 'nose', C2: 'leftEye', C3: 'rightEye', C4: 'leftEar', C5: 'rightEar',
-                C6: 'leftShoulder', C7: 'rightShoulder', C8: 'leftElbow', C9: 'rightElbow',
-                C10: 'leftWrist', C11: 'rightWrist', C12: 'leftHip', C13: 'rightHip',
-                C14: 'leftKnee', C15: 'rightKnee', C16: 'leftAnkle', C17: 'rightAnkle'
+                C1: 'nose', C2: 'left_eye', C3: 'right_eye', C4: 'left_ear', C5: 'right_ear',
+                C6: 'left_shoulder', C7: 'right_shoulder', C8: 'left_elbow', C9: 'right_elbow',
+                C10: 'left_wrist', C11: 'right_wrist', C12: 'left_hip', C13: 'right_hip',
+                C14: 'left_knee', C15: 'right_knee', C16: 'left_ankle', C17: 'right_ankle'
             },
             normatives: {
                 shoulder_rom: {
@@ -1213,6 +1214,10 @@
         let repDetector = null;
         let sessionData = {};
 
+        // ========== DOM ELEMENTS ==========
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+
         // ========== EVENT LISTENERS ==========
         document.getElementById('startBtn').addEventListener('click', startCamera);
         document.getElementById('calibrateBtn').addEventListener('click', calibrate);
@@ -1244,6 +1249,7 @@
                 poseRenderer = new PoseRenderer(document.getElementById('canvas'));
                 
                 document.getElementById('startBtn').disabled = true;
+                document.getElementById('calibrateBtn').disabled = false;
                 updateStatus('Validating Position...', 'status-validating');
                 
                 detectPose();

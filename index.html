@@ -3,33 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Physio-Mimica - Real-time Movement Analysis</title>
+    <title>Physio-Mimica - Clinical Movement Analysis</title>
     
-    <!-- External Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #333;
         }
         
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         
         .header {
             background: rgba(255, 255, 255, 0.95);
@@ -40,11 +31,7 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
         }
         
-        .header h1 {
-            color: #667eea;
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
+        .header h1 { color: #667eea; font-size: 2rem; margin-bottom: 10px; }
         
         .main-grid {
             display: grid;
@@ -79,9 +66,38 @@
             object-fit: contain;
         }
         
-        #canvas {
-            pointer-events: none;
-            z-index: 1;
+        #canvas { pointer-events: none; z-index: 1; }
+        
+        .pace-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(102, 126, 234, 0.3);
+            border: 4px solid #667eea;
+            z-index: 2;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .rep-counter {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 2;
+            display: none;
         }
         
         .metrics-panel {
@@ -107,23 +123,9 @@
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
         }
         
-        .metric-label {
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        
-        .metric-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .metric-unit {
-            font-size: 0.9rem;
-            color: #999;
-            margin-left: 5px;
-        }
+        .metric-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; }
+        .metric-value { font-size: 1.5rem; font-weight: bold; color: #333; }
+        .metric-unit { font-size: 0.9rem; color: #999; margin-left: 5px; }
         
         .controls {
             background: rgba(255, 255, 255, 0.95);
@@ -134,12 +136,7 @@
             margin-bottom: 20px;
         }
         
-        .control-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
+        .control-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         
         .btn {
             padding: 12px 24px;
@@ -152,34 +149,15 @@
             color: white;
         }
         
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .btn-success { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+        .btn-danger { background: linear-gradient(135deg, #f093fb, #f5576c); }
+        .btn-info { background: linear-gradient(135deg, #4facfe, #00f2fe); }
         
-        .btn-success {
-            background: linear-gradient(135deg, #43e97b, #38f9d7);
-        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,0,0,0.2); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         
-        .btn-danger {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
-        }
-        
-        .btn-info {
-            background: linear-gradient(135deg, #4facfe, #00f2fe);
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        select {
+        select, input[type="number"] {
             padding: 10px 15px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
@@ -189,10 +167,7 @@
             transition: all 0.3s ease;
         }
         
-        select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
+        select:focus, input:focus { outline: none; border-color: #667eea; }
         
         .status-bar {
             background: rgba(255, 255, 255, 0.95);
@@ -215,17 +190,13 @@
             animation: pulse 2s infinite;
         }
         
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         
         .status-active { background: #43e97b; }
         .status-recording { background: #f5576c; }
         .status-idle { background: #999; }
         .status-validating { background: #ffc107; }
-
+        
         .discrepancy-item {
             padding: 10px;
             margin: 5px 0;
@@ -233,20 +204,9 @@
             font-size: 0.9rem;
         }
         
-        .severity-high {
-            background: rgba(245, 87, 108, 0.2);
-            border-left: 4px solid #f5576c;
-        }
-        
-        .severity-medium {
-            background: rgba(255, 193, 7, 0.2);
-            border-left: 4px solid #ffc107;
-        }
-        
-        .severity-low {
-            background: rgba(67, 233, 123, 0.2);
-            border-left: 4px solid #43e97b;
-        }
+        .severity-high { background: rgba(245, 87, 108, 0.2); border-left: 4px solid #f5576c; }
+        .severity-medium { background: rgba(255, 193, 7, 0.2); border-left: 4px solid #ffc107; }
+        .severity-low { background: rgba(67, 233, 123, 0.2); border-left: 4px solid #43e97b; }
         
         .modal {
             display: none;
@@ -265,50 +225,31 @@
             background: white;
             border-radius: 20px;
             padding: 30px;
-            max-width: 800px;
+            max-width: 900px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
         }
-
-        .chart-container {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
         
-        .progress-bar {
-            width: 100%;
-            height: 30px;
-            background: #e0e0e0;
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 20px 0;
-        }
+        .chart-container { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
         
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            transition: width 0.3s ease;
+        .goal-input-group {
             display: flex;
+            gap: 10px;
             align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
+            margin-bottom: 10px;
         }
         
-        @media (max-width: 768px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        .goal-input-group label { min-width: 150px; font-weight: 600; }
+        
+        @media (max-width: 768px) { .main-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🔬 Physio-Mimica</h1>
-            <p>Advanced Real-time Movement Analysis & Physiotherapy Assessment</p>
+            <p>Clinical-Grade Real-time Movement Analysis & Physiotherapy Assessment</p>
         </div>
         
         <div class="status-bar">
@@ -332,20 +273,11 @@
                     <option value="shoulder_rom">Shoulder ROM (Abduction)</option>
                     <option value="knee_flexion">Knee Flexion (Squat)</option>
                     <option value="balance">Balance Test</option>
-                    <option value="supine">Supine (Bed)</option>
-                    <option value="prone">Prone Position</option>
-                </select>
-                
-                <select id="orientationSelect">
-                    <option value="standing">Standing</option>
-                    <option value="sitting">Sitting</option>
-                    <option value="supine">Supine (Lying)</option>
-                    <option value="prone">Prone</option>
-                    <option value="side">Side-lying</option>
                 </select>
                 
                 <button id="startBtn" class="btn btn-primary">Start Camera</button>
                 <button id="calibrateBtn" class="btn btn-info" disabled>Calibrate</button>
+                <button id="goalsBtn" class="btn btn-info" disabled>Set Goals</button>
                 <button id="recordBtn" class="btn btn-success" disabled>Record</button>
                 <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
                 <button id="reportBtn" class="btn btn-primary" disabled>Generate Report</button>
@@ -357,24 +289,32 @@
                 <div class="video-container">
                     <video id="video" autoplay muted></video>
                     <canvas id="canvas"></canvas>
-                </div>
-                <div class="progress-bar" style="margin-top: 20px;">
-                    <div class="progress-fill" id="progressBar" style="width: 0%">
-                        <span id="progressText">0%</span>
-                    </div>
+                    <div class="pace-indicator" id="paceIndicator">↕</div>
+                    <div class="rep-counter" id="repCounter">Rep: 0/0</div>
                 </div>
             </div>
             
             <div class="metrics-panel">
                 <h3 style="margin-bottom: 15px; color: #667eea;">Live Metrics</h3>
-                <div id="metricsContainer">
-                    <!-- Metrics will be dynamically populated here -->
-                </div>
-                <div class="metric-label" style="margin-top: 20px;">Movement Quality</div>
+                <div id="metricsContainer"></div>
+                <div class="metric-label" style="margin-top: 20px;">Movement Quality Alerts</div>
                 <div id="discrepancyContainer"></div>
             </div>
         </div>
         
+        <!-- Goals Modal -->
+        <div class="modal" id="goalsModal">
+            <div class="modal-content">
+                <h2>Set Session Goals</h2>
+                <div id="goalsForm"></div>
+                <div class="control-row" style="margin-top: 20px;">
+                    <button onclick="saveGoals()" class="btn btn-success">Save Goals</button>
+                    <button onclick="closeGoalsModal()" class="btn btn-danger">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Report Modal -->
         <div class="modal" id="reportModal">
             <div class="modal-content">
                 <h2>Session Report</h2>
@@ -396,53 +336,74 @@
     </div>
 
     <script>
-        // Core System Configuration
+        // ========== CONFIGURATION ==========
         const CONFIG = {
-            fps: 30, // Reduced for more stable performance with heavier model
-            smoothingWindow: 5,
-            confidenceThreshold: 0.6, // Increased for higher quality detection
+            fps: 30,
+            confidenceThreshold: 0.6,
             minKeypointsForValidPose: 12,
+            // FIXED: Correct MoveNet keypoint names (camelCase)
             jointMap: {
-                C1: 'nose', C2: 'left_eye', C3: 'right_eye', C4: 'left_ear', C5: 'right_ear',
-                C6: 'left_shoulder', C7: 'right_shoulder', C8: 'left_elbow', C9: 'right_elbow',
-                C10: 'left_wrist', C11: 'right_wrist', C12: 'left_hip', C13: 'right_hip',
-                C14: 'left_knee', C15: 'right_knee', C16: 'left_ankle', C17: 'right_ankle'
+                C1: 'nose', C2: 'leftEye', C3: 'rightEye', C4: 'leftEar', C5: 'rightEar',
+                C6: 'leftShoulder', C7: 'rightShoulder', C8: 'leftElbow', C9: 'rightElbow',
+                C10: 'leftWrist', C11: 'rightWrist', C12: 'leftHip', C13: 'rightHip',
+                C14: 'leftKnee', C15: 'rightKnee', C16: 'leftAnkle', C17: 'rightAnkle'
             },
             normatives: {
-                // Expanded normative data
                 shoulder_rom: {
                     abduction: { min: 150, max: 180, optimal: 170 },
-                    torsoLeanMax: 15, // Max allowable torso lean in degrees
-                    symmetryDiffMax: 15 // Max allowable difference between L/R ROM
+                    torsoLeanMax: 15,
+                    torsoRotationMax: 0.2, // Shoulder width ratio change threshold
+                    symmetryDiffMax: 15
                 },
                 knee_flexion: {
                     flexion: { min: 90, max: 120, optimal: 110 },
                     hipFlexion: { min: 80, max: 110, optimal: 100 },
-                    kneeValgusMax: 10, // Max inward knee movement angle
+                    pelvicShiftMax: 50, // pixels
                     symmetryDiffMax: 10
                 },
                 balance: {
-                    swayAreaMax: 2500 // Max postural sway area (pixels squared)
+                    swayAreaMax: 2500,
+                    copDisplacementMax: 100
+                },
+                sit_to_stand: {
+                    hipAngleMin: 90,
+                    kneeAngleMin: 90,
+                    asymmetryMax: 15
+                },
+                gait: {
+                    strideSymmetryMax: 0.15,
+                    stepWidthNormal: { min: 0.08, max: 0.15 }
                 }
+            },
+            pacing: {
+                shoulder_rom: { up: 2, down: 2 },
+                knee_flexion: { down: 2, up: 2 }
             }
         };
 
-        // Global State
+        // ========== GLOBAL STATE ==========
         let detector = null;
         let isRecording = false;
         let isCalibrating = false;
         let isPositionValid = false;
         let animationId = null;
-        let calibrationData = { pose: null, ratios: null };
+        let calibrationData = { pose: null, ratios: null, baseline: null };
         let frameCount = 0;
         let lastFrameTime = Date.now();
         let fps = 0;
         let lastPose = null;
         let previousMetrics = {};
+        let sessionGoals = {};
+        let repCount = 0;
+        let targetReps = 10;
+        let lastRepState = null;
+        let pacePhase = 0;
+        let paceInterval = null;
+        
         window.myTimeSeriesChart = null;
         window.mySymmetryChart = null;
 
-        // --- Class Definitions ---
+        // ========== JOINT PROCESSOR CLASS ==========
         class JointProcessor {
             constructor() { this.smoothingBuffer = {}; }
 
@@ -458,7 +419,6 @@
             }
 
             smoothJoints(joints) {
-                // EMA smoothing
                 const alpha = 0.4;
                 Object.keys(joints).forEach(code => {
                     if (!this.smoothingBuffer[code]) { this.smoothingBuffer[code] = joints[code]; }
@@ -471,8 +431,14 @@
             }
         }
 
+        // ========== METRICS CALCULATOR CLASS ==========
         class MetricsCalculator {
-            constructor() { this.romTracking = {}; }
+            constructor() { 
+                this.romTracking = {}; 
+                this.swayPoints = [];
+                this.pelvicPositions = [];
+                this.shoulderWidthHistory = [];
+            }
 
             calculateAngle(p1, p2, p3) {
                 if (!p1 || !p2 || !p3) return null;
@@ -486,22 +452,15 @@
                 return Math.acos(Math.max(-1, Math.min(1, cosAngle))) * 180 / Math.PI;
             }
 
-            calculateVelocity(current, previous, deltaTime) {
-                if (!previous || !current || !deltaTime) return 0;
-                const dx = current.x - previous.x;
-                const dy = current.y - previous.y;
-                return Math.sqrt(dx*dx + dy*dy) / deltaTime;
-            }
-            
-            calculateAcceleration(currentVel, previousVel, deltaTime) {
-                if (previousVel === undefined || !deltaTime) return 0;
-                return (currentVel - previousVel) / deltaTime;
+            calculateDistance(p1, p2) {
+                if (!p1 || !p2) return 0;
+                return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
             }
 
             calculateMetrics(joints, previousJoints, deltaTime) {
                 const metrics = {};
                 
-                // --- Angles ---
+                // Basic joint angles
                 metrics.leftShoulderAngle = this.calculateAngle(joints.C8, joints.C6, joints.C12);
                 metrics.rightShoulderAngle = this.calculateAngle(joints.C9, joints.C7, joints.C13);
                 metrics.leftElbowAngle = this.calculateAngle(joints.C6, joints.C8, joints.C10);
@@ -510,39 +469,57 @@
                 metrics.rightHipAngle = this.calculateAngle(joints.C7, joints.C13, joints.C15);
                 metrics.leftKneeAngle = this.calculateAngle(joints.C12, joints.C14, joints.C16);
                 metrics.rightKneeAngle = this.calculateAngle(joints.C13, joints.C15, joints.C17);
+                metrics.leftAnkleAngle = this.calculateAngle(joints.C14, joints.C16, { x: joints.C16.x, y: joints.C16.y + 100 });
+                metrics.rightAnkleAngle = this.calculateAngle(joints.C15, joints.C17, { x: joints.C17.x, y: joints.C17.y + 100 });
 
-                // Torso Lean
+                // SOLUTION: Torso Rotation Index
+                if (joints.C6 && joints.C7) {
+                    const shoulderWidth = this.calculateDistance(joints.C6, joints.C7);
+                    this.shoulderWidthHistory.push(shoulderWidth);
+                    if (this.shoulderWidthHistory.length > 30) this.shoulderWidthHistory.shift();
+                    
+                    if (this.shoulderWidthHistory.length > 10) {
+                        const avgWidth = this.shoulderWidthHistory.reduce((a,b) => a+b, 0) / this.shoulderWidthHistory.length;
+                        metrics.torsoRotationIndex = Math.abs(shoulderWidth - avgWidth) / avgWidth;
+                    }
+                }
+
+                // Torso lean angle
                 if (joints.C6 && joints.C7 && joints.C12 && joints.C13) {
                     const shoulderMid = { x: (joints.C6.x + joints.C7.x) / 2, y: (joints.C6.y + joints.C7.y) / 2 };
                     const hipMid = { x: (joints.C12.x + joints.C13.x) / 2, y: (joints.C12.y + joints.C13.y) / 2 };
                     metrics.torsoAngle = 90 - (Math.atan2(shoulderMid.y - hipMid.y, shoulderMid.x - hipMid.x) * 180 / Math.PI);
                 }
 
-                // --- Dynamic Metrics ---
-                if (previousJoints && deltaTime > 0) {
-                    Object.keys(joints).forEach(jointCode => {
-                        const vel = this.calculateVelocity(joints[jointCode], previousJoints[jointCode], deltaTime);
-                        metrics[`vel_${jointCode}`] = vel;
-                        metrics[`accel_${jointCode}`] = this.calculateAcceleration(vel, previousMetrics[`vel_${jointCode}`], deltaTime);
-                    });
+                // SOLUTION: Pelvic Shift Monitoring
+                if (joints.C12 && joints.C13) {
+                    const pelvicMid = { x: (joints.C12.x + joints.C13.x) / 2, y: (joints.C12.y + joints.C13.y) / 2 };
+                    this.pelvicPositions.push(pelvicMid);
+                    if (this.pelvicPositions.length > 30) this.pelvicPositions.shift();
+                    
+                    if (this.pelvicPositions.length > 5) {
+                        const xPositions = this.pelvicPositions.map(p => p.x);
+                        const avgX = xPositions.reduce((a,b) => a+b, 0) / xPositions.length;
+                        metrics.pelvicShift = Math.abs(pelvicMid.x - avgX);
+                    }
                 }
-                
-                // Postural Sway (area of hip movement)
+
+                // Postural sway
                 if (isRecording) {
                     const hipMid = joints.C12 && joints.C13 ? { x: (joints.C12.x + joints.C13.x) / 2, y: (joints.C12.y + joints.C13.y) / 2 } : null;
                     if (hipMid) {
-                        if (!this.swayPoints) this.swayPoints = [];
                         this.swayPoints.push(hipMid);
-                        // Simplified sway calculation - range of movement
-                        const xSway = Math.max(...this.swayPoints.map(p => p.x)) - Math.min(...this.swayPoints.map(p => p.x));
-                        const ySway = Math.max(...this.swayPoints.map(p => p.y)) - Math.min(...this.swayPoints.map(p => p.y));
-                        metrics.posturalSway = xSway * ySway;
+                        if (this.swayPoints.length > 1) {
+                            const xSway = Math.max(...this.swayPoints.map(p => p.x)) - Math.min(...this.swayPoints.map(p => p.x));
+                            const ySway = Math.max(...this.swayPoints.map(p => p.y)) - Math.min(...this.swayPoints.map(p => p.y));
+                            metrics.posturalSway = xSway * ySway;
+                        }
                     }
                 }
 
                 this.updateROM(metrics);
 
-                // --- Symmetry ---
+                // Symmetry calculations
                 if (metrics.leftKneeAngle_ROM !== undefined && metrics.rightKneeAngle_ROM !== undefined) {
                     metrics.kneeSymmetryDifference = Math.abs(metrics.leftKneeAngle_ROM - metrics.rightKneeAngle_ROM);
                 }
@@ -557,8 +534,10 @@
             updateROM(metrics) {
                 if (!isRecording) return;
                 Object.keys(metrics).forEach(key => {
-                    if (key.includes('Angle') && metrics[key] !== null) {
-                        if (!this.romTracking[key]) { this.romTracking[key] = { min: metrics[key], max: metrics[key] }; }
+                    if (key.includes('Angle') && metrics[key] !== null && !isNaN(metrics[key])) {
+                        if (!this.romTracking[key]) { 
+                            this.romTracking[key] = { min: metrics[key], max: metrics[key] }; 
+                        }
                         this.romTracking[key].min = Math.min(this.romTracking[key].min, metrics[key]);
                         this.romTracking[key].max = Math.max(this.romTracking[key].max, metrics[key]);
                         metrics[`${key}_ROM`] = this.romTracking[key].max - this.romTracking[key].min;
@@ -566,39 +545,125 @@
                 });
             }
             
-            reset() { this.romTracking = {}; this.swayPoints = []; }
+            reset() { 
+                this.romTracking = {}; 
+                this.swayPoints = []; 
+                this.pelvicPositions = [];
+                this.shoulderWidthHistory = [];
+            }
         }
 
+        // ========== DISCREPANCY ANALYZER CLASS ==========
         class DiscrepancyAnalyzer {
             analyze(metrics, task) {
                 const discrepancies = [];
                 const norm = CONFIG.normatives[task];
                 if (!norm) return discrepancies;
 
+                // Use session goals if available, otherwise use normatives
+                const goals = sessionGoals[task] || {};
+
                 switch (task) {
                     case 'shoulder_rom':
-                        const rom = metrics.rightShoulderAngle_ROM || metrics.leftShoulderAngle_ROM || 0;
-                        if (rom < norm.abduction.min) {
-                            discrepancies.push(this.createDiscrepancy('Shoulder ROM', 'low', `Range of motion (${rom.toFixed(0)}°) is below the expected minimum of ${norm.abduction.min}°.`, 'Focus on pendular exercises and wall slides to improve mobility.'));
+                        const shoulderROM = Math.max(metrics.rightShoulderAngle_ROM || 0, metrics.leftShoulderAngle_ROM || 0);
+                        const targetROM = goals.targetROM || norm.abduction.min;
+                        
+                        if (shoulderROM < targetROM) {
+                            discrepancies.push(this.createDiscrepancy('Shoulder ROM', 'low', 
+                                `Range of motion (${shoulderROM.toFixed(0)}°) is below target of ${targetROM}°.`, 
+                                'Focus on pendular exercises and wall slides to improve mobility.'));
                         }
-                        if (Math.abs(metrics.torsoAngle || 0) > norm.torsoLeanMax) {
-                            discrepancies.push(this.createDiscrepancy('Torso Lean', 'medium', `Excessive torso lean (${Math.abs(metrics.torsoAngle || 0).toFixed(0)}°) detected as compensation.`, 'Engage core muscles and focus on isolating shoulder movement.'));
+                        
+                        // SOLUTION: Compensatory movement flagging
+                        if (Math.abs(metrics.torsoAngle || 0) > (goals.maxTorsoLean || norm.torsoLeanMax)) {
+                            discrepancies.push(this.createDiscrepancy('⚠ Compensatory Movement', 'medium', 
+                                `Excessive torso lean (${Math.abs(metrics.torsoAngle || 0).toFixed(0)}°) detected.`, 
+                                'Engage core and focus on isolated shoulder movement.'));
                         }
+                        
+                        if ((metrics.torsoRotationIndex || 0) > norm.torsoRotationMax) {
+                            discrepancies.push(this.createDiscrepancy('⚠ Torso Rotation', 'medium', 
+                                `Torso rotation detected during movement.`, 
+                                'Keep shoulders square to camera. Avoid rotating body.'));
+                        }
+                        
                         if ((metrics.shoulderSymmetryDifference || 0) > norm.symmetryDiffMax) {
-                             discrepancies.push(this.createDiscrepancy('Symmetry', 'medium', `Significant asymmetry (${metrics.shoulderSymmetryDifference.toFixed(0)}°) between left and right shoulder ROM.`, 'Incorporate unilateral exercises to strengthen the weaker side.'));
+                            discrepancies.push(this.createDiscrepancy('Asymmetry', 'medium', 
+                                `Significant asymmetry (${metrics.shoulderSymmetryDifference.toFixed(0)}°) between sides.`, 
+                                'Include unilateral exercises for weaker side.'));
                         }
                         break;
                     
                     case 'knee_flexion':
-                        const flexion = metrics.leftKneeAngle_ROM || metrics.rightKneeAngle_ROM || 0;
-                         if (flexion < norm.flexion.min) {
-                            discrepancies.push(this.createDiscrepancy('Knee Flexion', 'low', `Squat depth (${flexion.toFixed(0)}°) is below the expected minimum of ${norm.flexion.min}°.`, 'Improve ankle and hip mobility; try box squats to a lower surface.'));
+                        const kneeFlexion = Math.max(metrics.leftKneeAngle_ROM || 0, metrics.rightKneeAngle_ROM || 0);
+                        const targetFlexion = goals.targetKneeFlexion || norm.flexion.min;
+                        
+                        if (kneeFlexion < targetFlexion) {
+                            discrepancies.push(this.createDiscrepancy('Knee Flexion', 'low', 
+                                `Squat depth (${kneeFlexion.toFixed(0)}°) is below target of ${targetFlexion}°.`, 
+                                'Improve ankle and hip mobility; try box squats.'));
                         }
-                         if ((metrics.kneeSymmetryDifference || 0) > norm.symmetryDiffMax) {
-                             discrepancies.push(this.createDiscrepancy('Symmetry', 'high', `Significant weight shift or asymmetry (${metrics.kneeSymmetryDifference.toFixed(0)}°) detected between knees.`, 'Focus on single-leg stability exercises like lunges and step-downs.'));
+                        
+                        // SOLUTION: Pelvic shift flagging
+                        if ((metrics.pelvicShift || 0) > norm.pelvicShiftMax) {
+                            discrepancies.push(this.createDiscrepancy('⚠ Weight Shift', 'high', 
+                                `Significant lateral pelvic shift detected.`, 
+                                'Focus on bilateral weight distribution and single-leg stability.'));
+                        }
+                        
+                        if ((metrics.kneeSymmetryDifference || 0) > norm.symmetryDiffMax) {
+                            discrepancies.push(this.createDiscrepancy('Asymmetry', 'high', 
+                                `Movement asymmetry (${metrics.kneeSymmetryDifference.toFixed(0)}°) between knees.`, 
+                                'Single-leg exercises like lunges and step-downs recommended.'));
+                        }
+                        break;
+                    
+                    case 'balance':
+                        if ((metrics.posturalSway || 0) > norm.swayAreaMax) {
+                            discrepancies.push(this.createDiscrepancy('Postural Sway', 'medium', 
+                                `Excessive postural sway detected.`, 
+                                'Practice standing balance with eyes closed; strengthen core and ankles.'));
+                        }
+                        break;
+                    
+                    case 'sit_to_stand':
+                        const hipAngle = Math.min(metrics.leftHipAngle || 180, metrics.rightHipAngle || 180);
+                        if (hipAngle > 180 - norm.hipAngleMin) {
+                            discrepancies.push(this.createDiscrepancy('Hip Flexion', 'medium', 
+                                `Insufficient hip flexion during transition.`, 
+                                'Lean forward more at start; strengthen hip flexors.'));
+                        }
+                        
+                        const hipAsymmetry = Math.abs((metrics.leftHipAngle || 0) - (metrics.rightHipAngle || 0));
+                        if (hipAsymmetry > norm.asymmetryMax) {
+                            discrepancies.push(this.createDiscrepancy('Hip Asymmetry', 'high', 
+                                `Uneven weight distribution during sit-to-stand.`, 
+                                'Focus on bilateral weight bearing; check for pain or weakness.'));
+                        }
+                        break;
+                    
+                    case 'gait':
+                        // Stride length analysis
+                        if (metrics.leftAnkleAngle && metrics.rightAnkleAngle) {
+                            const ankleAsymmetry = Math.abs(metrics.leftAnkleAngle - metrics.rightAnkleAngle);
+                            if (ankleAsymmetry > 15) {
+                                discrepancies.push(this.createDiscrepancy('Gait Asymmetry', 'medium', 
+                                    `Uneven stride pattern detected.`, 
+                                    'Check for limping; assess for pain or weakness.'));
+                            }
+                        }
+                        break;
+                    
+                    case 'general':
+                        // General posture check
+                        if (Math.abs(metrics.torsoAngle || 0) > 20) {
+                            discrepancies.push(this.createDiscrepancy('Posture', 'low', 
+                                `Significant postural deviation noted.`, 
+                                'Work on postural awareness and core stability.'));
                         }
                         break;
                 }
+                
                 return discrepancies;
             }
 
@@ -607,14 +672,19 @@
             }
         }
         
+        // ========== POSE RENDERER CLASS ==========
         class PoseRenderer {
-            constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); }
+            constructor(canvas) { 
+                this.canvas = canvas; 
+                this.ctx = canvas.getContext('2d'); 
+            }
             
             render(pose, metrics, discrepancies) {
-                this.canvas.width = video.videoWidth; this.canvas.height = video.videoHeight;
+                this.canvas.width = video.videoWidth; 
+                this.canvas.height = video.videoHeight;
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 
-                if (isCalibrating) { this.drawTPoseSilhouette(); }
+                if (isCalibrating) { this.drawNaturalStanceSilhouette(); }
 
                 if (!pose) return;
                 const { keypoints } = pose;
@@ -624,9 +694,13 @@
                 this.ctx.lineWidth = 3;
                 
                 connections.forEach(([i, j]) => {
-                    const kp1 = keypoints[i]; const kp2 = keypoints[j];
+                    const kp1 = keypoints[i]; 
+                    const kp2 = keypoints[j];
                     if (kp1.score > CONFIG.confidenceThreshold && kp2.score > CONFIG.confidenceThreshold) {
-                        this.ctx.beginPath(); this.ctx.moveTo(kp1.x, kp1.y); this.ctx.lineTo(kp2.x, kp2.y); this.ctx.stroke();
+                        this.ctx.beginPath(); 
+                        this.ctx.moveTo(kp1.x, kp1.y); 
+                        this.ctx.lineTo(kp2.x, kp2.y); 
+                        this.ctx.stroke();
                     }
                 });
                 
@@ -638,45 +712,91 @@
             }
 
             drawJoint(x, y, color) {
-                this.ctx.beginPath(); this.ctx.arc(x, y, 8, 0, 2 * Math.PI);
-                this.ctx.fillStyle = color; this.ctx.fill();
-                this.ctx.strokeStyle = 'white'; this.ctx.lineWidth = 2; this.ctx.stroke();
+                this.ctx.beginPath(); 
+                this.ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                this.ctx.fillStyle = color; 
+                this.ctx.fill();
+                this.ctx.strokeStyle = 'white'; 
+                this.ctx.lineWidth = 2; 
+                this.ctx.stroke();
             }
 
-            drawTPoseSilhouette() {
-                const w = this.canvas.width; const h = this.canvas.height;
+            // SOLUTION: Natural stance instead of T-pose
+            drawNaturalStanceSilhouette() {
+                const w = this.canvas.width; 
+                const h = this.canvas.height;
                 this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                this.ctx.lineWidth = 5; this.ctx.setLineDash([10, 5]);
+                this.ctx.lineWidth = 5; 
+                this.ctx.setLineDash([10, 5]);
 
                 // Head
-                this.ctx.beginPath(); this.ctx.arc(w/2, h*0.2, 30, 0, 2 * Math.PI); this.ctx.stroke();
+                this.ctx.beginPath(); 
+                this.ctx.arc(w/2, h*0.2, 30, 0, 2 * Math.PI); 
+                this.ctx.stroke();
                 // Body
-                this.ctx.beginPath(); this.ctx.moveTo(w/2, h*0.2 + 30); this.ctx.lineTo(w/2, h*0.6); this.ctx.stroke();
-                // Arms
-                this.ctx.beginPath(); this.ctx.moveTo(w*0.25, h*0.4); this.ctx.lineTo(w*0.75, h*0.4); this.ctx.stroke();
+                this.ctx.beginPath(); 
+                this.ctx.moveTo(w/2, h*0.2 + 30); 
+                this.ctx.lineTo(w/2, h*0.6); 
+                this.ctx.stroke();
+                // Arms at sides (natural stance)
+                this.ctx.beginPath(); 
+                this.ctx.moveTo(w*0.45, h*0.35); 
+                this.ctx.lineTo(w*0.42, h*0.5); 
+                this.ctx.stroke();
+                this.ctx.beginPath(); 
+                this.ctx.moveTo(w*0.55, h*0.35); 
+                this.ctx.lineTo(w*0.58, h*0.5); 
+                this.ctx.stroke();
                 // Legs
-                this.ctx.beginPath(); this.ctx.moveTo(w/2, h*0.6); this.ctx.lineTo(w*0.4, h*0.9); this.ctx.stroke();
-                this.ctx.beginPath(); this.ctx.moveTo(w/2, h*0.6); this.ctx.lineTo(w*0.6, h*0.9); this.ctx.stroke();
+                this.ctx.beginPath(); 
+                this.ctx.moveTo(w/2, h*0.6); 
+                this.ctx.lineTo(w*0.45, h*0.9); 
+                this.ctx.stroke();
+                this.ctx.beginPath(); 
+                this.ctx.moveTo(w/2, h*0.6); 
+                this.ctx.lineTo(w*0.55, h*0.9); 
+                this.ctx.stroke();
                 
                 this.ctx.setLineDash([]);
+                
+                // Text instructions
+                this.ctx.fillStyle = 'white';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('Stand naturally with arms at sides', w/2, h*0.1);
             }
         }
 
+        // ========== DATA RECORDER CLASS ==========
         class DataRecorder {
             constructor() { this.frames = []; }
-            addFrame(frameData) { this.frames.push({ timestamp: new Date().toISOString(), ...frameData }); }
+            
+            addFrame(frameData) { 
+                this.frames.push({ 
+                    timestamp: new Date().toISOString(), 
+                    frameNumber: this.frames.length,
+                    ...frameData 
+                }); 
+            }
             
             exportJSON(sessionData) {
-                const data = { ...sessionData, frames: this.frames, summary: this.generateSummary() };
+                const data = { 
+                    ...sessionData, 
+                    frames: this.frames, 
+                    summary: this.generateSummary() 
+                };
                 return JSON.stringify(data, null, 2);
             }
             
             exportCSV() {
                 if (this.frames.length === 0) return '';
-                const headers = ['timestamp', ...Object.keys(this.frames[0].metrics)];
+                const headers = ['timestamp', 'frameNumber', ...Object.keys(this.frames[0].metrics)];
                 const rows = this.frames.map(f => {
-                    const row = [f.timestamp];
-                    Object.keys(this.frames[0].metrics).forEach(key => row.push(f.metrics[key] || ''));
+                    const row = [f.timestamp, f.frameNumber];
+                    Object.keys(this.frames[0].metrics).forEach(key => {
+                        const val = f.metrics[key];
+                        row.push(typeof val === 'number' ? val.toFixed(2) : (val || ''));
+                    });
                     return row.join(',');
                 });
                 return [headers.join(','), ...rows].join('\n');
@@ -684,17 +804,23 @@
             
             generateSummary() {
                 const summary = { metrics_summary: {}, discrepancy_summary: [] };
-                const metricTotals = {}; let discrepancySet = new Map();
+                const metricTotals = {}; 
+                let discrepancySet = new Map();
 
                 this.frames.forEach(f => {
                     Object.entries(f.metrics).forEach(([key, value]) => {
                         if (typeof value === 'number' && !isNaN(value)) {
-                            if (!metricTotals[key]) { metricTotals[key] = { sum: 0, count: 0, min: value, max: value }; }
-                            metricTotals[key].sum += value; metricTotals[key].count++;
+                            if (!metricTotals[key]) { 
+                                metricTotals[key] = { sum: 0, count: 0, min: value, max: value, values: [] }; 
+                            }
+                            metricTotals[key].sum += value; 
+                            metricTotals[key].count++;
                             metricTotals[key].min = Math.min(metricTotals[key].min, value);
                             metricTotals[key].max = Math.max(metricTotals[key].max, value);
+                            metricTotals[key].values.push(value);
                         }
                     });
+                    
                     f.discrepancies.forEach(d => {
                         if (!discrepancySet.has(d.issue)) discrepancySet.set(d.issue, d);
                     });
@@ -702,84 +828,378 @@
                 
                 Object.entries(metricTotals).forEach(([key, data]) => {
                     summary.metrics_summary[key] = {
-                        average: data.sum / data.count, min: data.min,
-                        max: data.max, range: data.max - data.min
+                        average: data.sum / data.count, 
+                        min: data.min,
+                        max: data.max, 
+                        range: data.max - data.min,
+                        stdDev: this.calculateStdDev(data.values)
                     };
                 });
                 
                 summary.discrepancy_summary = Array.from(discrepancySet.values());
                 return summary;
             }
+            
+            calculateStdDev(values) {
+                const avg = values.reduce((a,b) => a+b, 0) / values.length;
+                const squareDiffs = values.map(v => Math.pow(v - avg, 2));
+                const avgSquareDiff = squareDiffs.reduce((a,b) => a+b, 0) / squareDiffs.length;
+                return Math.sqrt(avgSquareDiff);
+            }
 
             reset() { this.frames = []; }
         }
 
+        // ========== REPORT GENERATOR CLASS ==========
         class ReportGenerator {
             generateHTMLReport(data) {
                 let html = `
                     <p><strong>Session ID:</strong> ${data.session_id}</p>
                     <p><strong>Task:</strong> ${data.task}</p>
                     <p><strong>Duration:</strong> ${data.duration.toFixed(2)}s</p>
-                    <h3>Discrepancy Summary</h3>`;
+                    <p><strong>Total Frames:</strong> ${data.frames.length}</p>
+                    <p><strong>Date:</strong> ${new Date(data.startTime).toLocaleString()}</p>
+                `;
+                
+                // Session Goals vs Achieved
+                if (Object.keys(sessionGoals).length > 0) {
+                    html += '<h3>Goals vs Achieved</h3><ul>';
+                    const goals = sessionGoals[data.task] || {};
+                    Object.entries(goals).forEach(([key, targetValue]) => {
+                        let achieved = 'N/A';
+                        const summary = data.summary.metrics_summary;
+                        
+                        if (key === 'targetROM' && summary.leftShoulderAngle_ROM) {
+                            achieved = `${summary.leftShoulderAngle_ROM.max.toFixed(1)}°`;
+                        } else if (key === 'targetKneeFlexion' && summary.leftKneeAngle_ROM) {
+                            achieved = `${summary.leftKneeAngle_ROM.max.toFixed(1)}°`;
+                        }
+                        
+                        html += `<li><strong>${key}:</strong> Target: ${targetValue} | Achieved: ${achieved}</li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                html += '<h3>Discrepancy Summary</h3>';
                 
                 if (data.summary.discrepancy_summary.length > 0) {
                     html += '<ul>';
                     data.summary.discrepancy_summary.forEach(d => {
-                        html += `<li><strong>${d.metric} (${d.severity}):</strong> ${d.issue} <em>${d.recommendation}</em></li>`;
+                        html += `<li class="severity-${d.severity}"><strong>${d.metric} (${d.severity}):</strong> ${d.issue} <br><em>Recommendation: ${d.recommendation}</em></li>`;
                     });
                     html += '</ul>';
                 } else {
-                    html += '<p>No significant discrepancies detected. Good job!</p>';
+                    html += '<p style="color: #43e97b; font-weight: bold;">✓ No significant discrepancies detected. Excellent performance!</p>';
                 }
                 
-                html += '<h3>Metrics Analysis</h3><ul>';
+                html += '<h3>Metrics Analysis</h3><table style="width: 100%; border-collapse: collapse;">';
+                html += '<tr style="background: #f0f0f0;"><th style="padding: 8px; text-align: left;">Metric</th><th>Average</th><th>Min</th><th>Max</th><th>Range</th><th>Std Dev</th></tr>';
+                
                 Object.entries(data.summary.metrics_summary).forEach(([key, stats]) => {
-                    if (key.includes('Angle') || key.includes('Symmetry'))
-                    html += `<li><strong>${key}:</strong> 
-                        Avg: ${stats.average.toFixed(2)}, 
-                        Range: ${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}</li>`;
+                    if (key.includes('Angle') || key.includes('Symmetry') || key.includes('ROM')) {
+                        html += `<tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 8px;"><strong>${key}</strong></td>
+                            <td style="text-align: center;">${stats.average.toFixed(2)}</td>
+                            <td style="text-align: center;">${stats.min.toFixed(2)}</td>
+                            <td style="text-align: center;">${stats.max.toFixed(2)}</td>
+                            <td style="text-align: center;">${stats.range.toFixed(2)}</td>
+                            <td style="text-align: center;">${stats.stdDev.toFixed(2)}</td>
+                        </tr>`;
+                    }
                 });
-                html += '</ul>';
+                html += '</table>';
+                
                 return html;
             }
 
             renderCharts(data) {
                 const task = data.task;
-                let keyMetric = null;
-                if (task === 'knee_flexion') keyMetric = 'leftKneeAngle';
-                else if (task === 'shoulder_rom') keyMetric = 'leftShoulderAngle';
+                
+                // SOLUTION: Dynamic chart selection based on task
+                let primaryMetric = null;
+                let secondaryMetric = null;
+                
+                switch(task) {
+                    case 'knee_flexion':
+                        primaryMetric = 'leftKneeAngle';
+                        secondaryMetric = 'rightKneeAngle';
+                        break;
+                    case 'shoulder_rom':
+                        primaryMetric = 'leftShoulderAngle';
+                        secondaryMetric = 'rightShoulderAngle';
+                        break;
+                    case 'sit_to_stand':
+                        primaryMetric = 'leftHipAngle';
+                        secondaryMetric = 'rightHipAngle';
+                        break;
+                    case 'gait':
+                        primaryMetric = 'leftKneeAngle';
+                        secondaryMetric = 'rightKneeAngle';
+                        break;
+                    case 'balance':
+                        primaryMetric = 'posturalSway';
+                        break;
+                    default:
+                        primaryMetric = 'torsoAngle';
+                }
                 
                 // Time Series Chart
-                if (keyMetric) {
+                if (primaryMetric && data.frames.length > 0) {
                     const labels = data.frames.map((_, i) => i);
-                    const chartData = data.frames.map(f => f.metrics[keyMetric]);
+                    const primaryData = data.frames.map(f => f.metrics[primaryMetric]).filter(v => v !== undefined && v !== null);
+                    const secondaryData = secondaryMetric ? data.frames.map(f => f.metrics[secondaryMetric]).filter(v => v !== undefined && v !== null) : [];
+                    
                     if (window.myTimeSeriesChart) window.myTimeSeriesChart.destroy();
+                    
+                    const datasets = [{
+                        label: primaryMetric,
+                        data: primaryData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }];
+                    
+                    if (secondaryData.length > 0) {
+                        datasets.push({
+                            label: secondaryMetric,
+                            data: secondaryData,
+                            borderColor: '#764ba2',
+                            backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        });
+                    }
+                    
                     window.myTimeSeriesChart = new Chart(document.getElementById('timeSeriesChart'), {
                         type: 'line',
-                        data: { labels, datasets: [{ label: keyMetric, data: chartData, borderColor: '#667eea', tension: 0.1 }] },
-                        options: { responsive: true, plugins: { title: { display: true, text: 'Joint Angle Over Time' }}}
+                        data: { labels: labels.slice(0, primaryData.length), datasets },
+                        options: { 
+                            responsive: true, 
+                            plugins: { 
+                                title: { display: true, text: 'Joint Angles Over Time' },
+                                legend: { display: true }
+                            },
+                            scales: {
+                                y: { beginAtZero: false, title: { display: true, text: 'Angle (degrees)' }},
+                                x: { title: { display: true, text: 'Frame Number' }}
+                            }
+                        }
                     });
                 }
 
                 // Symmetry Chart
                 const summary = data.summary.metrics_summary;
                 let symmLabels = [], symmData = [];
+                
                 if (summary.leftShoulderAngle_ROM && summary.rightShoulderAngle_ROM) {
                     symmLabels = ['Left Shoulder ROM', 'Right Shoulder ROM'];
                     symmData = [summary.leftShoulderAngle_ROM.range, summary.rightShoulderAngle_ROM.range];
                 } else if (summary.leftKneeAngle_ROM && summary.rightKneeAngle_ROM) {
                     symmLabels = ['Left Knee ROM', 'Right Knee ROM'];
                     symmData = [summary.leftKneeAngle_ROM.range, summary.rightKneeAngle_ROM.range];
+                } else if (summary.leftHipAngle_ROM && summary.rightHipAngle_ROM) {
+                    symmLabels = ['Left Hip ROM', 'Right Hip ROM'];
+                    symmData = [summary.leftHipAngle_ROM.range, summary.rightHipAngle_ROM.range];
                 }
 
                 if (symmLabels.length > 0) {
                     if (window.mySymmetryChart) window.mySymmetryChart.destroy();
                     window.mySymmetryChart = new Chart(document.getElementById('symmetryChart'), {
                         type: 'bar',
-                        data: { labels: symmLabels, datasets: [{ label: 'Range of Motion (°)', data: symmData, backgroundColor: ['#764ba2', '#667eea'] }] },
-                        options: { responsive: true, plugins: { title: { display: true, text: 'Bilateral Symmetry' }}}
+                        data: { 
+                            labels: symmLabels, 
+                            datasets: [{ 
+                                label: 'Range of Motion (°)', 
+                                data: symmData, 
+                                backgroundColor: ['#764ba2', '#667eea'] 
+                            }] 
+                        },
+                        options: { 
+                            responsive: true, 
+                            plugins: { 
+                                title: { display: true, text: 'Bilateral Symmetry Comparison' }
+                            },
+                            scales: {
+                                y: { beginAtZero: true, title: { display: true, text: 'ROM (degrees)' }}
+                            }
+                        }
                     });
                 }
+            }
+            
+            // SOLUTION: Complete PDF export implementation
+            generatePDF(data) {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Header
+                doc.setFontSize(20);
+                doc.setTextColor(102, 126, 234);
+                doc.text('Physio-Mimica Session Report', 20, 20);
+                
+                // Session Info
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0);
+                doc.text(`Session ID: ${data.session_id}`, 20, 35);
+                doc.text(`Task: ${data.task}`, 20, 42);
+                doc.text(`Duration: ${data.duration.toFixed(2)}s`, 20, 49);
+                doc.text(`Date: ${new Date(data.startTime).toLocaleString()}`, 20, 56);
+                doc.text(`Total Frames: ${data.frames.length}`, 20, 63);
+                
+                let yPos = 75;
+                
+                // Goals Section
+                if (Object.keys(sessionGoals).length > 0) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(102, 126, 234);
+                    doc.text('Session Goals', 20, yPos);
+                    yPos += 7;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    const goals = sessionGoals[data.task] || {};
+                    Object.entries(goals).forEach(([key, value]) => {
+                        doc.text(`${key}: ${value}`, 25, yPos);
+                        yPos += 6;
+                    });
+                    yPos += 5;
+                }
+                
+                // Discrepancies
+                doc.setFontSize(14);
+                doc.setTextColor(102, 126, 234);
+                doc.text('Movement Quality Assessment', 20, yPos);
+                yPos += 7;
+                
+                doc.setFontSize(10);
+                doc.setTextColor(0, 0, 0);
+                
+                if (data.summary.discrepancy_summary.length > 0) {
+                    data.summary.discrepancy_summary.forEach(d => {
+                        if (yPos > 270) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`${d.metric} (${d.severity}):`, 25, yPos);
+                        yPos += 6;
+                        doc.setFont(undefined, 'normal');
+                        const issueLines = doc.splitTextToSize(d.issue, 160);
+                        doc.text(issueLines, 30, yPos);
+                        yPos += issueLines.length * 5;
+                        doc.setTextColor(100, 100, 100);
+                        const recLines = doc.splitTextToSize(`Recommendation: ${d.recommendation}`, 160);
+                        doc.text(recLines, 30, yPos);
+                        yPos += recLines.length * 5 + 3;
+                        doc.setTextColor(0, 0, 0);
+                    });
+                } else {
+                    doc.setTextColor(67, 233, 123);
+                    doc.text('No significant discrepancies detected. Excellent performance!', 25, yPos);
+                    yPos += 10;
+                    doc.setTextColor(0, 0, 0);
+                }
+                
+                // Metrics Summary
+                if (yPos > 200) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                
+                yPos += 10;
+                doc.setFontSize(14);
+                doc.setTextColor(102, 126, 234);
+                doc.text('Key Metrics Summary', 20, yPos);
+                yPos += 10;
+                
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                
+                Object.entries(data.summary.metrics_summary).forEach(([key, stats]) => {
+                    if (key.includes('Angle') || key.includes('ROM') || key.includes('Symmetry')) {
+                        if (yPos > 280) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                        doc.text(`${key}:`, 25, yPos);
+                        doc.text(`Avg: ${stats.average.toFixed(1)}° | Range: ${stats.min.toFixed(1)}-${stats.max.toFixed(1)}° | SD: ${stats.stdDev.toFixed(1)}`, 80, yPos);
+                        yPos += 6;
+                    }
+                });
+                
+                // Charts
+                if (window.myTimeSeriesChart) {
+                    doc.addPage();
+                    const chartImg = document.getElementById('timeSeriesChart').toDataURL('image/png');
+                    doc.text('Joint Angle Progression', 20, 20);
+                    doc.addImage(chartImg, 'PNG', 20, 30, 170, 100);
+                }
+                
+                if (window.mySymmetryChart) {
+                    const symmImg = document.getElementById('symmetryChart').toDataURL('image/png');
+                    doc.text('Bilateral Symmetry', 20, 145);
+                    doc.addImage(symmImg, 'PNG', 20, 155, 170, 100);
+                }
+                
+                doc.save(`physio_mimica_${data.session_id}.pdf`);
+            }
+        }
+        
+        // ========== REPETITION DETECTOR ==========
+        class RepetitionDetector {
+            constructor(task) {
+                this.task = task;
+                this.lastPeakValue = null;
+                this.lastValleyValue = null;
+                this.state = 'neutral'; // 'neutral', 'ascending', 'descending'
+                this.threshold = 20; // degrees change threshold
+            }
+            
+            detectRep(metrics) {
+                let currentValue = null;
+                
+                switch(this.task) {
+                    case 'knee_flexion':
+                        currentValue = Math.min(metrics.leftKneeAngle || 180, metrics.rightKneeAngle || 180);
+                        break;
+                    case 'shoulder_rom':
+                        currentValue = Math.max(metrics.leftShoulderAngle || 0, metrics.rightShoulderAngle || 0);
+                        break;
+                    default:
+                        return false;
+                }
+                
+                if (currentValue === null) return false;
+                
+                // State machine for rep detection
+                if (this.state === 'neutral') {
+                    this.lastPeakValue = currentValue;
+                    this.lastValleyValue = currentValue;
+                    this.state = 'descending';
+                } else if (this.state === 'descending') {
+                    if (currentValue < this.lastValleyValue) {
+                        this.lastValleyValue = currentValue;
+                    } else if (currentValue - this.lastValleyValue > this.threshold) {
+                        this.state = 'ascending';
+                    }
+                } else if (this.state === 'ascending') {
+                    if (currentValue > this.lastPeakValue) {
+                        this.lastPeakValue = currentValue;
+                    } else if (this.lastPeakValue - currentValue > this.threshold) {
+                        this.state = 'descending';
+                        this.lastValleyValue = currentValue;
+                        return true; // Rep completed!
+                    }
+                }
+                
+                return false;
+            }
+            
+            reset() {
+                this.lastPeakValue = null;
+                this.lastValleyValue = null;
+                this.state = 'neutral';
             }
         }
         
@@ -790,25 +1210,37 @@
         const dataRecorder = new DataRecorder();
         const reportGenerator = new ReportGenerator();
         let poseRenderer = null;
+        let repDetector = null;
         let sessionData = {};
 
-        // --- Core Application Logic ---
+        // ========== EVENT LISTENERS ==========
         document.getElementById('startBtn').addEventListener('click', startCamera);
         document.getElementById('calibrateBtn').addEventListener('click', calibrate);
+        document.getElementById('goalsBtn').addEventListener('click', showGoalsModal);
         document.getElementById('recordBtn').addEventListener('click', startRecording);
         document.getElementById('stopBtn').addEventListener('click', stopRecording);
         document.getElementById('reportBtn').addEventListener('click', generateReport);
         
+        // SOLUTION: Anatomical baseline calibration
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: CONFIG.fps } }
+                    video: { 
+                        width: { ideal: 1280 }, 
+                        height: { ideal: 720 }, 
+                        frameRate: { ideal: CONFIG.fps } 
+                    }
                 });
                 video.srcObject = stream;
                 await video.play();
                 
-                const detectorConfig = { modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER }; // Upgraded Model
-                detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig);
+                const detectorConfig = { 
+                    modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER 
+                };
+                detector = await poseDetection.createDetector(
+                    poseDetection.SupportedModels.MoveNet, 
+                    detectorConfig
+                );
                 poseRenderer = new PoseRenderer(document.getElementById('canvas'));
                 
                 document.getElementById('startBtn').disabled = true;
@@ -816,56 +1248,249 @@
                 
                 detectPose();
                 
-            } catch (error) { console.error('Error starting camera:', error); alert('Failed to start camera.'); }
+            } catch (error) { 
+                console.error('Error starting camera:', error); 
+                alert('Failed to start camera. Please check permissions.');
+            }
         }
         
+        // SOLUTION: Fixed calibration - captures natural anatomical baseline
         function calibrate() {
-            if (!isPositionValid) { alert('Please ensure you are fully visible in the frame before calibrating.'); return; }
-            updateStatus('Calibrating... Hold T-Pose', 'status-validating');
+            if (!isPositionValid) { 
+                alert('Please ensure you are fully visible in the frame before calibrating.'); 
+                return; 
+            }
+            
+            updateStatus('Calibrating... Stand naturally with arms at sides', 'status-validating');
             isCalibrating = true;
             
-            setTimeout(() => {
-                isCalibrating = false;
+            const calibrationPoses = [];
+            const captureInterval = setInterval(() => {
                 if (lastPose) {
-                    calibrationData.pose = lastPose;
-                    // TODO: Calculate and store anatomical ratios
-                    document.getElementById('recordBtn').disabled = false;
-                    updateStatus('Calibration Complete. Ready to Record.', 'status-active');
-                } else {
-                    updateStatus('Calibration Failed. Pose not detected.', 'status-idle');
+                    calibrationPoses.push(JSON.parse(JSON.stringify(lastPose)));
                 }
-            }, 5000); // 5 seconds for calibration
+            }, 100);
+            
+            setTimeout(() => {
+                clearInterval(captureInterval);
+                isCalibrating = false;
+                
+                if (calibrationPoses.length > 0) {
+                    // Use the median pose to avoid outliers
+                    calibrationData.pose = calibrationPoses[Math.floor(calibrationPoses.length / 2)];
+                    
+                    // SOLUTION: Calculate anatomical ratios
+                    const joints = jointProcessor.processKeypoints(calibrationData.pose.keypoints);
+                    
+                    if (joints.C6 && joints.C7 && joints.C12 && joints.C13) {
+                        const shoulderWidth = Math.sqrt(
+                            Math.pow(joints.C7.x - joints.C6.x, 2) + 
+                            Math.pow(joints.C7.y - joints.C6.y, 2)
+                        );
+                        const hipWidth = Math.sqrt(
+                            Math.pow(joints.C13.x - joints.C12.x, 2) + 
+                            Math.pow(joints.C13.y - joints.C12.y, 2)
+                        );
+                        const torsoHeight = Math.sqrt(
+                            Math.pow((joints.C6.x + joints.C7.x)/2 - (joints.C12.x + joints.C13.x)/2, 2) + 
+                            Math.pow((joints.C6.y + joints.C7.y)/2 - (joints.C12.y + joints.C13.y)/2, 2)
+                        );
+                        
+                        calibrationData.ratios = {
+                            shoulderWidth,
+                            hipWidth,
+                            torsoHeight,
+                            shoulderToHipRatio: shoulderWidth / hipWidth
+                        };
+                    }
+                    
+                    // Store baseline angles
+                    const baselineMetrics = metricsCalculator.calculateMetrics(joints, null, 0);
+                    calibrationData.baseline = {
+                        leftShoulderAngle: baselineMetrics.leftShoulderAngle,
+                        rightShoulderAngle: baselineMetrics.rightShoulderAngle,
+                        leftHipAngle: baselineMetrics.leftHipAngle,
+                        rightHipAngle: baselineMetrics.rightHipAngle,
+                        leftKneeAngle: baselineMetrics.leftKneeAngle,
+                        rightKneeAngle: baselineMetrics.rightKneeAngle
+                    };
+                    
+                    document.getElementById('recordBtn').disabled = false;
+                    document.getElementById('goalsBtn').disabled = false;
+                    updateStatus('Calibration Complete. Set goals or start recording.', 'status-active');
+                } else {
+                    updateStatus('Calibration Failed. No pose detected.', 'status-idle');
+                    alert('Calibration failed. Please ensure you are visible and try again.');
+                }
+            }, 3000); // 3 seconds for natural stance calibration
+        }
+        
+        // SOLUTION: Pre-session goal setting
+        function showGoalsModal() {
+            const task = document.getElementById('taskSelect').value;
+            const goalsForm = document.getElementById('goalsForm');
+            goalsForm.innerHTML = '';
+            
+            let goalInputs = [];
+            
+            switch(task) {
+                case 'shoulder_rom':
+                    goalInputs = [
+                        { label: 'Target Shoulder ROM (degrees)', key: 'targetROM', default: 150, min: 90, max: 180 },
+                        { label: 'Max Allowable Torso Lean (degrees)', key: 'maxTorsoLean', default: 15, min: 5, max: 30 },
+                        { label: 'Target Repetitions', key: 'targetReps', default: 10, min: 1, max: 50 }
+                    ];
+                    break;
+                case 'knee_flexion':
+                    goalInputs = [
+                        { label: 'Target Knee Flexion (degrees)', key: 'targetKneeFlexion', default: 90, min: 60, max: 120 },
+                        { label: 'Max Pelvic Shift (pixels)', key: 'maxPelvicShift', default: 50, min: 20, max: 100 },
+                        { label: 'Target Repetitions', key: 'targetReps', default: 10, min: 1, max: 50 }
+                    ];
+                    break;
+                case 'balance':
+                    goalInputs = [
+                        { label: 'Max Postural Sway Area', key: 'maxSwayArea', default: 2500, min: 1000, max: 5000 },
+                        { label: 'Test Duration (seconds)', key: 'testDuration', default: 30, min: 10, max: 120 }
+                    ];
+                    break;
+                case 'sit_to_stand':
+                    goalInputs = [
+                        { label: 'Target Repetitions', key: 'targetReps', default: 5, min: 1, max: 20 },
+                        { label: 'Max Hip Asymmetry (degrees)', key: 'maxAsymmetry', default: 15, min: 5, max: 30 }
+                    ];
+                    break;
+                case 'gait':
+                    goalInputs = [
+                        { label: 'Analysis Duration (seconds)', key: 'testDuration', default: 30, min: 10, max: 120 },
+                        { label: 'Max Stride Asymmetry', key: 'maxStrideAsymmetry', default: 0.15, min: 0.05, max: 0.3 }
+                    ];
+                    break;
+                default:
+                    goalInputs = [
+                        { label: 'Session Duration (seconds)', key: 'testDuration', default: 30, min: 10, max: 120 }
+                    ];
+            }
+            
+            goalInputs.forEach(input => {
+                const div = document.createElement('div');
+                div.className = 'goal-input-group';
+                div.innerHTML = `
+                    <label>${input.label}:</label>
+                    <input type="number" id="goal_${input.key}" value="${input.default}" 
+                           min="${input.min}" max="${input.max}" step="${input.key.includes('Asymmetry') ? '0.01' : '1'}">
+                `;
+                goalsForm.appendChild(div);
+            });
+            
+            document.getElementById('goalsModal').style.display = 'flex';
+        }
+        
+        function saveGoals() {
+            const task = document.getElementById('taskSelect').value;
+            const inputs = document.getElementById('goalsForm').querySelectorAll('input');
+            sessionGoals[task] = {};
+            
+            inputs.forEach(input => {
+                const key = input.id.replace('goal_', '');
+                sessionGoals[task][key] = parseFloat(input.value);
+                
+                if (key === 'targetReps') {
+                    targetReps = parseInt(input.value);
+                }
+            });
+            
+            closeGoalsModal();
+            updateStatus('Goals set successfully. Ready to record.', 'status-active');
+        }
+        
+        function closeGoalsModal() {
+            document.getElementById('goalsModal').style.display = 'none';
         }
         
         function startRecording() {
             dataRecorder.reset();
             metricsCalculator.reset();
+            repCount = 0;
+            
+            const task = document.getElementById('taskSelect').value;
+            repDetector = new RepetitionDetector(task);
+            
             isRecording = true;
             sessionData = {
-                session_id: `S${new Date().toISOString().replace(/[-:.]/g, '')}`,
-                task: document.getElementById('taskSelect').value,
-                orientation: document.getElementById('orientationSelect').value,
-                startTime: Date.now()
+                session_id: `S${Date.now()}`,
+                task: task,
+                startTime: Date.now(),
+                calibrationData: calibrationData,
+                goals: sessionGoals[task] || {}
             };
             
             document.getElementById('recordBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             document.getElementById('reportBtn').disabled = true;
+            document.getElementById('calibrateBtn').disabled = true;
+            document.getElementById('goalsBtn').disabled = true;
             document.getElementById('sessionId').textContent = sessionData.session_id;
+            
+            // SOLUTION: Show pace indicator and rep counter for relevant tasks
+            if (task === 'shoulder_rom' || task === 'knee_flexion') {
+                document.getElementById('repCounter').style.display = 'block';
+                document.getElementById('repCounter').textContent = `Rep: 0/${targetReps}`;
+                startPaceIndicator(task);
+            }
+            
             updateStatus('Recording...', 'status-recording');
+        }
+        
+        // SOLUTION: Visual pacing system
+        function startPaceIndicator(task) {
+            const paceDiv = document.getElementById('paceIndicator');
+            paceDiv.style.display = 'flex';
+            
+            const pacing = CONFIG.pacing[task];
+            if (!pacing) return;
+            
+            const totalCycle = (pacing.up + pacing.down) * 1000;
+            let phase = 'up';
+            
+            paceInterval = setInterval(() => {
+                if (phase === 'up') {
+                    paceDiv.textContent = '↑';
+                    paceDiv.style.background = 'rgba(67, 233, 123, 0.5)';
+                    setTimeout(() => {
+                        phase = 'down';
+                        paceDiv.textContent = '↓';
+                        paceDiv.style.background = 'rgba(245, 87, 108, 0.5)';
+                    }, pacing.up * 1000);
+                }
+                phase = 'up';
+            }, totalCycle);
         }
         
         function stopRecording() {
             isRecording = false;
             sessionData.endTime = Date.now();
             sessionData.duration = (sessionData.endTime - sessionData.startTime) / 1000;
+            sessionData.totalReps = repCount;
             
             document.getElementById('recordBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
             document.getElementById('reportBtn').disabled = false;
+            document.getElementById('calibrateBtn').disabled = false;
+            document.getElementById('goalsBtn').disabled = false;
+            
+            document.getElementById('repCounter').style.display = 'none';
+            document.getElementById('paceIndicator').style.display = 'none';
+            
+            if (paceInterval) {
+                clearInterval(paceInterval);
+                paceInterval = null;
+            }
+            
             updateStatus('Recording Stopped', 'status-active');
         }
         
+        // SOLUTION: Continuous position validation
         async function detectPose() {
             if (!detector) return;
             
@@ -873,56 +1498,96 @@
             
             if (poses.length > 0) {
                 lastPose = poses[0];
-                validatePosition(lastPose);
+                
+                // SOLUTION: Continuous validation (not just once)
+                const confidentKeypoints = lastPose.keypoints.filter(kp => kp.score > CONFIG.confidenceThreshold).length;
+                
+                if (confidentKeypoints >= CONFIG.minKeypointsForValidPose) {
+                    if (!isPositionValid) {
+                        isPositionValid = true;
+                        document.getElementById('calibrateBtn').disabled = false;
+                        updateStatus('Position Valid. Please Calibrate.', 'status-active');
+                    }
+                } else {
+                    if (isPositionValid && !isRecording) {
+                        isPositionValid = false;
+                        document.getElementById('calibrateBtn').disabled = true;
+                        updateStatus('Warning: Position compromised. Recalibration needed.', 'status-validating');
+                    }
+                }
                 
                 const joints = jointProcessor.processKeypoints(lastPose.keypoints);
                 const deltaTime = (Date.now() - lastFrameTime) / 1000;
                 const metrics = metricsCalculator.calculateMetrics(joints, previousMetrics.joints, deltaTime);
                 const discrepancies = discrepancyAnalyzer.analyze(metrics, document.getElementById('taskSelect').value);
                 
-                if (poseRenderer) { poseRenderer.render(lastPose, metrics, discrepancies); }
+                if (poseRenderer) { 
+                    poseRenderer.render(lastPose, metrics, discrepancies); 
+                }
                 updateMetricsDisplay(metrics);
                 updateDiscrepancyDisplay(discrepancies);
+                
+                // SOLUTION: Repetition detection
+                if (isRecording && repDetector) {
+                    if (repDetector.detectRep(metrics)) {
+                        repCount++;
+                        document.getElementById('repCounter').textContent = `Rep: ${repCount}/${targetReps}`;
+                        
+                        // Auto-stop if target reached
+                        if (repCount >= targetReps) {
+                            setTimeout(() => {
+                                if (isRecording) stopRecording();
+                            }, 1000);
+                        }
+                    }
+                }
                 
                 if (isRecording) {
                     dataRecorder.addFrame({ joints, metrics, discrepancies });
                     frameCount++;
+                }
+                
+                previousMetrics.joints = joints;
+            } else {
+                // No pose detected
+                if (isPositionValid && !isCalibrating) {
+                    isPositionValid = false;
+                    if (!isRecording) {
+                        updateStatus('No pose detected. Please position yourself in frame.', 'status-validating');
+                    }
                 }
             }
             
             updateFPS();
             animationId = requestAnimationFrame(detectPose);
         }
-
-        function validatePosition(pose) {
-            if (isPositionValid) return;
-            const confidentKeypoints = pose.keypoints.filter(kp => kp.score > CONFIG.confidenceThreshold).length;
-            if (confidentKeypoints >= CONFIG.minKeypointsForValidPose) {
-                isPositionValid = true;
-                document.getElementById('calibrateBtn').disabled = false;
-                updateStatus('Position OK. Please Calibrate.', 'status-active');
-            }
-        }
         
         function updateMetricsDisplay(metrics) {
             const container = document.getElementById('metricsContainer');
-            container.innerHTML = ''; // Clear previous metrics
+            container.innerHTML = '';
+            
             const metricsToShow = {
                 "L Shoulder Angle": metrics.leftShoulderAngle,
                 "R Shoulder Angle": metrics.rightShoulderAngle,
                 "L Knee Angle": metrics.leftKneeAngle,
                 "R Knee Angle": metrics.rightKneeAngle,
+                "L Hip Angle": metrics.leftHipAngle,
+                "R Hip Angle": metrics.rightHipAngle,
                 "Torso Lean": metrics.torsoAngle,
-                "Postural Sway": metrics.posturalSway
+                "Postural Sway": metrics.posturalSway,
+                "Pelvic Shift": metrics.pelvicShift,
+                "Torso Rotation": metrics.torsoRotationIndex ? (metrics.torsoRotationIndex * 100).toFixed(1) + '%' : null
             };
 
             Object.entries(metricsToShow).forEach(([label, value]) => {
                 if (value !== undefined && value !== null) {
                     const item = document.createElement('div');
                     item.className = 'metric-item';
+                    const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+                    const unit = label.includes('Angle') || label.includes('Lean') ? '°' : '';
                     item.innerHTML = `
                         <div class="metric-label">${label}</div>
-                        <div class="metric-value">${value.toFixed(1)}<span class="metric-unit">${label.includes('Angle') ? '°' : ''}</span></div>
+                        <div class="metric-value">${displayValue}<span class="metric-unit">${unit}</span></div>
                     `;
                     container.appendChild(item);
                 }
@@ -932,29 +1597,53 @@
         function updateDiscrepancyDisplay(discrepancies) {
             const container = document.getElementById('discrepancyContainer');
             container.innerHTML = '';
-            discrepancies.forEach(d => {
+            
+            if (discrepancies.length === 0) {
                 const item = document.createElement('div');
-                item.className = `discrepancy-item severity-${d.severity}`;
-                item.innerHTML = `<strong>${d.metric}:</strong> ${d.issue}`;
+                item.className = 'discrepancy-item severity-low';
+                item.innerHTML = '<strong>✓ Good Form</strong> No issues detected';
                 container.appendChild(item);
-            });
+            } else {
+                discrepancies.forEach(d => {
+                    const item = document.createElement('div');
+                    item.className = `discrepancy-item severity-${d.severity}`;
+                    item.innerHTML = `<strong>${d.metric}:</strong> ${d.issue}`;
+                    container.appendChild(item);
+                });
+            }
         }
         
         function generateReport() {
-            const data = { ...sessionData, frames: dataRecorder.frames, summary: dataRecorder.generateSummary() };
+            const data = { 
+                ...sessionData, 
+                frames: dataRecorder.frames, 
+                summary: dataRecorder.generateSummary() 
+            };
+            
             document.getElementById('reportContent').innerHTML = reportGenerator.generateHTMLReport(data);
             reportGenerator.renderCharts(data);
             document.getElementById('reportModal').style.display = 'flex';
+            
+            // Store data for export
+            window.currentReportData = data;
         }
         
         function exportReport(format) {
-            const data = { ...sessionData, frames: dataRecorder.frames, summary: dataRecorder.generateSummary() };
+            const data = window.currentReportData;
+            if (!data) {
+                alert('No report data available');
+                return;
+            }
+            
             const filename = `physio_mimica_${sessionData.session_id}`;
 
             if (format === 'json') {
                 downloadFile(JSON.stringify(data, null, 2), `${filename}.json`, 'application/json');
             } else if (format === 'csv') {
                 downloadFile(dataRecorder.exportCSV(), `${filename}.csv`, 'text/csv');
+            } else if (format === 'pdf') {
+                // SOLUTION: Complete PDF export
+                reportGenerator.generatePDF(data);
             }
         }
         
@@ -962,7 +1651,9 @@
             const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = filename; a.click();
+            a.href = url; 
+            a.download = filename; 
+            a.click();
             URL.revokeObjectURL(url);
         }
 
@@ -979,11 +1670,15 @@
             document.getElementById('fpsCounter').textContent = `${fps} FPS`;
         }
 
-        function closeModal() { document.getElementById('reportModal').style.display = 'none'; }
+        function closeModal() { 
+            document.getElementById('reportModal').style.display = 'none'; 
+        }
         
+        // Cleanup
         window.addEventListener('beforeunload', () => {
             if (animationId) cancelAnimationFrame(animationId);
             if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+            if (paceInterval) clearInterval(paceInterval);
         });
     </script>
 </body>
